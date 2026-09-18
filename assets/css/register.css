@@ -1,0 +1,36 @@
+.page-register:before {
+  background-image: url("../images/login.jpg");
+}
+
+.page-register a {
+  color: #9fa8da;
+}
+
+.page-register form {
+  width: 400px;
+  margin: 22px auto;
+}
+
+.page-register select.form-control option{
+  color:#000 !important;
+}
+.page-register select.form-control>option:focus {
+  background: #bdbdbd !important;
+  border-bottom: 1px solid #bdbdbd !important;
+}
+
+.page-register .form-control, .page-register .floating-label, .page-register .form-control:focus + .floating-label {
+  color: #757575; 
+  /*#bdbdbd;*/
+}
+
+.page-register-bg {
+  background-image: url("../images/registerbg/formbg.png");
+  border-radius: 10px;
+}
+
+@media (max-width: 479px) {
+  .page-register form {
+    width: auto;
+  }
+}

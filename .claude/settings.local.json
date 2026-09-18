@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"/d/Program Files/php-8.5.5/php.exe\" \"C:\\\\Users\\\\Hansel\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Program-Files-xampp-htdocs-ezbit-main\\\\6b9e4da3-12f2-4b95-a593-e9b7a6e12916\\\\scratchpad\\\\test_pdf_overlay.php\" 58.5 68 \"C:\\\\Users\\\\Hansel\\\\AppData\\\\Local\\\\Temp\\\\test_original.pdf\")"
+    ]
+  }
+}

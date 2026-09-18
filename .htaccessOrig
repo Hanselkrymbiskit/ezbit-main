@@ -1,0 +1,88 @@
+<IfModule mod_rewrite.c>
+# Turn on URL rewriting
+RewriteEngine On
+
+# If your website begins from a folder e.g localhost/my_project then 
+# you have to change it to: RewriteBase /my_project/
+# If your site begins from the root e.g. example.local/ then
+# let it as it is
+RewriteBase /ezbit/
+RewriteRule (cron)\.php - [E=noconntimeout:1,E=noabort:1]
+#RewriteCond ${access:%{REMOTE_ADDR}} deny [NC]
+#RewriteRule ^ - [L,F]
+
+# Protect application and system files from being viewed when the index.php is missing
+RewriteCond $1 ^(application|system|private|logs|attachments)
+
+# Rewrite to index.php/access_denied/URL
+RewriteRule ^(.*)$ index.php/access_denied/$1 [PT,L]
+
+# Block access to hidden files and directories
+RewriteCond %{REQUEST_URI} "!(^|/)\.well-known/([^./]+./?)+$" [NC]
+RewriteCond %{SCRIPT_FILENAME} -d [OR]
+RewriteCond %{SCRIPT_FILENAME} -f
+RewriteRule "(^|/)\." - [F]
+
+# Disable TRACE HTTP Method
+RewriteCond %{REQUEST_METHOD} ^TRACE [NC]
+RewriteRule .* - [R=405,L]
+
+
+# Allow these directories and files to be displayed directly:
+RewriteCond $1 ^(index\.php|robots\.txt|favicon\.ico|assets|css|js|img|captcha|maintenance\.php)
+
+# No rewriting
+RewriteRule ^(.*)$ - [PT,L]
+
+# Rewrite to index.php/URL
+RewriteRule ^(.*)$ index.php/$1 [PT,L]
+
+</IfModule>
+
+<IfModule mod_headers.c>
+
+Header onsuccess edit Set-Cookie ^(.*(?i:HttpOnly).*)$ ;;;HttpOnly_ALREADY_SET;;;$1
+Header onsuccess edit Set-Cookie ^((?!;;;HttpOnly_ALREADY_SET;;;).*)$ $1;HttpOnly
+Header onsuccess edit Set-Cookie ^(?:;;;HttpOnly_ALREADY_SET;;;)(.*)$ $1
+Header always edit Set-Cookie ^(.*(?i:HttpOnly).*)$ ;;;HttpOnly_ALREADY_SET;;;$1
+Header always edit Set-Cookie ^((?!;;;HttpOnly_ALREADY_SET;;;).*)$ $1;HttpOnly
+Header always edit Set-Cookie ^(?:;;;HttpOnly_ALREADY_SET;;;)(.*)$ $1
+
+Header onsuccess edit Set-Cookie ^(.*(?i:SameSite=).*)$ ;;;SameSite_ALREADY_SET;;;$1
+Header onsuccess edit Set-Cookie ^((?!;;;SameSite_ALREADY_SET;;;).*)$ $1;SameSite=strict
+Header onsuccess edit Set-Cookie ^(?:;;;SameSite_ALREADY_SET;;;)(.*)$ $1
+Header always edit Set-Cookie ^(.*(?i:SameSite=).*)$ ;;;SameSite_ALREADY_SET;;;$1
+Header always edit Set-Cookie ^((?!;;;SameSite_ALREADY_SET;;;).*)$ $1;SameSite=strict
+Header always edit Set-Cookie ^(?:;;;SameSite_ALREADY_SET;;;)(.*)$ $1
+
+<If "%{HTTPS} == 'on'">
+  Header onsuccess edit Set-Cookie ^(.*(?i:Secure).*)$ ;;;Secure_ALREADY_SET;;;$1
+  Header onsuccess edit Set-Cookie ^((?!;;;Secure_ALREADY_SET;;;).*)$ $1;Secure
+  Header onsuccess edit Set-Cookie ^(?:;;;Secure_ALREADY_SET;;;)(.*)$ $1
+  Header always edit Set-Cookie ^(.*(?i:Secure).*)$ ;;;Secure_ALREADY_SET;;;$1
+  Header always edit Set-Cookie ^((?!;;;Secure_ALREADY_SET;;;).*)$ $1;Secure
+  Header always edit Set-Cookie ^(?:;;;Secure_ALREADY_SET;;;)(.*)$ $1
+</If>
+
+Header unset X-Powered-By
+Header always unset X-Powered-By
+Header always set X-Frame-Options "SAMEORIGIN"
+Header always set X-Content-Type-Options "nosniff"
+Header set X-XSS-Protection "1; mode=block"
+Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+
+Header always set Content-Security-Policy "expr=default-src 'self' %{HTTP_HOST} 'nonce-%{base64:%{reqenv:UNIQUE_ID}}'; img-src 'self' %{HTTP_HOST}    data: 'nonce-%{base64:%{reqenv:UNIQUE_ID}}';style-src 'self' %{HTTP_HOST}  'nonce-%{base64:%{reqenv:UNIQUE_ID}}'; style-src-attr 'self' %{HTTP_HOST} 'unsafe-inline'; style-src-elem 'self' %{HTTP_HOST} ; script-src-elem 'self' %{HTTP_HOST} 'nonce-%{base64:%{reqenv:UNIQUE_ID}}' 'unsafe-inline';script-src 'self' %{HTTP_HOST}   'unsafe-inline' ;form-action 'none'; object-src 'self' %{HTTP_HOST}  data: 'nonce-%{base64:%{reqenv:UNIQUE_ID}}' 'unsafe-inline'; frame-src 'self' %{HTTP_HOST} https://www.google.com data: 'nonce-%{base64:%{reqenv:UNIQUE_ID}}'; frame-ancestors 'self' %{HTTP_HOST}; connect-src 'self' %{HTTP_HOST} https://www.google.com;"
+
+</IfModule>
+
+<FilesMatch "^\.">
+Require all denied
+</FilesMatch>
+
+<IfModule mod_autoindex.c>
+    Options -Indexes -Includes +FollowSymLinks
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddDefaultCharset utf-8
+</IfModule>
