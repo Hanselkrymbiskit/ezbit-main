@@ -1,0 +1,139 @@
+{
+  "preauth_type": 6,
+  "illness": "Kidney Transplantation",
+  "template": "PreAuth_06.pdf",
+  "note": "Oncologist/gastroenterologist medical-clearance blocks and the 3 Informed Consent/Conforme blocks tied to items 7.2/8.2/10 have no DB fields (confirmed against M_preauth_form_flds::preauth_06) and are deliberately left unmapped, same as the original hardcoded block.",
+  "pages": {
+    "1": [
+      { "type": "facility_name", "source": "patientinfo", "x": 70, "y": 52.2, "fontsize": 12, "align": "left" },
+      { "type": "facility_name", "source": "patientinfo", "x": 70, "y": 59.3, "fontsize": 12, "align": "left", "column": "inst_address_street" },
+
+      { "type": "fullname",  "source": "patientinfo", "prefix": "patient", "x": 50, "y": 70, "w": 98, "fontsize": 7 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "M", "x": 146.7, "y": 70.6, "fontsize": 9 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "F", "x": 162.85, "y": 70.6, "fontsize": 9 },
+      { "type": "boxed_segments", "source": "patientinfo", "field": "patient_philhealthno", "fontsize": 8,
+        "segments": [
+          { "start": 0, "length": 2, "x": 99.50, "pitch": 5.63, "y": 76.3 },
+          { "start": 2, "length": 9, "x": 115.63, "pitch": 5.646, "y": 76.3 },
+          { "start": 11, "length": 1, "x": 171.27, "pitch": 5.63, "y": 76.3 }
+        ]
+      },
+
+      { "type": "member_toggle", "source": "patientinfo", "conditionField": "patient_is_member", "match": "Y",
+        "same": { "type": "mark", "x": 25.5, "y": 89.3, "fontsize": 7 },
+        "different": {
+          "member_name": { "type": "fullname", "source": "patientinfo", "prefix": "member", "x": 50, "y": 93, "w": 98, "fontsize": 7 },
+          "member_id":   { "type": "boxed_segments", "source": "patientinfo", "field": "member_philhealthno", "fontsize": 8,
+            "segments": [
+              { "start": 0, "length": 2, "x": 99.50, "pitch": 5.63, "y": 98.5 },
+              { "start": 2, "length": 9, "x": 115.63, "pitch": 5.646, "y": 98.5 },
+              { "start": 11, "length": 1, "x": 171.27, "pitch": 5.63, "y": 98.5 }
+            ]
+          },
+          "extra": [
+            { "type": "checkbox", "source": "patientinfo", "field": "member_sex", "match": "M", "x": 146.83, "y": 87.3, "fontsize": 7 },
+            { "type": "checkbox", "source": "patientinfo", "field": "member_sex", "match": "F", "x": 162.96, "y": 87.3, "fontsize": 7 }
+          ]
+        }
+      },
+
+      { "type": "checkbox", "source": "checklist", "field": "q_0_1", "match": "NA", "x": 141.5, "y": 113.5, "fontsize": 7 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_2", "match": "1", "x": 24.5, "y": 119.4, "fontsize": 7 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_2", "match": "2", "x": 112.3, "y": 119.8, "fontsize": 7 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_2_1", "match": "1", "x": 29.5, "y": 123.7, "fontsize": 7 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_2_1", "match": "2", "x": 61.5, "y": 123.7, "fontsize": 7 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_3", "match": "Y", "x": 24.5, "y": 130.8, "fontsize": 7 },
+      { "type": "date",     "source": "checklist", "field": "q_0_3_date", "x": 113.1, "y": 130.3, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_3_1", "match": "1", "x": 30.5, "y": 135.6, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_3_1", "match": "2", "x": 47.3, "y": 135.6, "fontsize": 9 },
+
+      { "type": "checkbox", "source": "checklist", "field": "q_0_4", "match": "1", "x": 25.5, "y": 173.3, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_4", "match": "2", "x": 23.5, "y": 204.5, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_4_1", "match": "1", "x": 30, "y": 176.1, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_4_1", "match": "2", "x": 30, "y": 180.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_5", "match": "1", "x": 72.5, "y": 171.6, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_5", "match": "2", "x": 72.5, "y": 181.3, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_6", "match": "1", "x": 127.5, "y": 170.5, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_6", "match": "2", "x": 127.5, "y": 189.7, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_7", "match": "1", "x": 127.5, "y": 212.1, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_0_7", "match": "2", "x": 127.5, "y": 216.9, "fontsize": 9 },
+
+      { "type": "checkbox", "source": "checklist", "field": "q_1_1", "match": "Y", "x": 163.0, "y": 246.6, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_2", "match": "Y", "x": 163.0, "y": 259.6, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_2", "match": "NA", "x": 175.5, "y": 259.6, "fontsize": 9 }
+    ],
+    "2": [
+      { "type": "checkbox", "source": "checklist", "field": "q_1_3", "match": "Y", "x": 163.0, "y": 47.6, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_3", "match": "NA", "x": 175.5, "y": 47.6, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_4", "match": "Y", "x": 163.0, "y": 61.1, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_5", "match": "Y", "x": 163.0, "y": 69.2, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6", "match": "N", "x": 29.5, "y": 82.1, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6", "match": "Y", "x": 29.5, "y": 86.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6_1", "match": "Y", "x": 163.0, "y": 96.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6_1", "match": "NA", "x": 175.0, "y": 96.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6_2", "match": "Y", "x": 163.0, "y": 105.0, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6_2", "match": "NA", "x": 175.0, "y": 105.0, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6_2_1", "match": "Y", "x": 163.0, "y": 114.8, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6_2_2", "match": "Y", "x": 163.0, "y": 119.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6_3", "match": "Y", "x": 163.0, "y": 129.4, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_6_4", "match": "Y", "x": 163.0, "y": 134.4, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_7", "match": "Y", "x": 163.0, "y": 148.8, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_8", "match": "Y", "x": 163.0, "y": 177.8, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_9", "match": "N", "x": 29.5, "y": 204.1, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_9", "match": "Y", "x": 29.5, "y": 208.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_10", "match": "Y", "x": 163.0, "y": 215.7, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_10", "match": ["N","NA"], "x": 175.0, "y": 215.7, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_10_1", "match": "Y", "x": 32.3, "y": 225.2, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_10_2", "match": "Y", "x": 32.3, "y": 234.8, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_10_3", "match": "Y", "x": 32.3, "y": 239.7, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_10_4", "match": "Y", "x": 32.3, "y": 244.5, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_10_5", "match": "Y", "x": 32.3, "y": 254.1, "fontsize": 9 }
+    ],
+    "3": [
+      { "type": "checkbox", "source": "checklist", "field": "q_1_11", "match": "Y", "x": 163.0, "y": 96.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_11", "match": "N", "x": 175.0, "y": 96.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_12", "match": "Y", "x": 163.0, "y": 105.1, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_12_1", "match": "Y", "x": 30.3, "y": 109.7, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_12_2", "match": "Y", "x": 30.3, "y": 114.5, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_12_3", "match": "Y", "x": 30.3, "y": 124.1, "fontsize": 9 }
+    ],
+    "4": [
+      { "type": "checkbox", "source": "checklist", "field": "q_1_13", "match": "Y", "x": 163.0, "y": 33.2, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_13", "match": "N", "x": 175.0, "y": 33.2, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_14", "match": "Y", "x": 163.0, "y": 41.4, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_14", "match": "NA", "x": 175.0, "y": 41.4, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_15", "match": "Y", "x": 163.0, "y": 60.8, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_15", "match": "NA", "x": 175.0, "y": 60.8, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_16_1", "match": "Y", "x": 163.0, "y": 224.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_16_1", "match": "NA", "x": 175.0, "y": 224.9, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_16_2", "match": "Y", "x": 163.0, "y": 230.1, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_16_2", "match": "NA", "x": 175.0, "y": 230.1, "fontsize": 9 }
+    ],
+    "5": [
+      { "type": "centered", "source": "checklist", "field": "crtby_attendingnephrologist", "decrypt": true, "x": 23.8, "y": 115.0, "w": 58.3, "fontsize": 6 },
+      { "type": "centered", "source": "checklist", "field": "crtby_attendingtransplantsurgeon", "decrypt": true, "x": 119.11, "y": 115.0, "w": 58.26, "fontsize": 6 },
+      { "type": "boxed_raw", "source": "checklist", "field": "crtby_attendingnephrologist_accreno", "decrypt": true, "x": 23.88, "y": 128.6, "pitch": 4.15, "fontsize": 8 },
+      { "type": "boxed_raw", "source": "checklist", "field": "crtby_attendingtransplantsurgeon_accreno", "decrypt": true, "x": 119.19, "y": 128.6, "pitch": 4.15, "fontsize": 8 },
+      { "type": "centered", "source": "checklist", "field": "crtby_patient", "decrypt": true, "x": 119.11, "y": 163, "w": 58.26, "fontsize": 7 },
+      { "type": "date",     "source": "checklist", "field": "crtby_patient_signeddate", "x": 171.5, "y": 180.0, "fontsize": 8 }
+    ],
+    "6": [
+      { "type": "date",     "source": "patientinfo", "field": "submitted_datetime", "x": 140, "y": 33.9, "fontsize": 9 },
+      { "type": "fullname", "source": "patientinfo", "prefix": "patient", "x": 15, "y": 45.5, "w": 90, "fontsize": 8 },
+      { "type": "facility_name", "source": "patientinfo", "x": 100, "y": 45.5, "w": 90, "fontsize": 8 },
+
+      { "type": "checkbox", "source": "request", "field": "copayment", "match": "wocp", "x": 23.9, "y": 75.8, "fontsize": 8 },
+      { "type": "checkbox", "source": "request", "field": "copayment", "match": "wcp", "x": 23.9, "y": 80.6, "fontsize": 8 },
+      { "type": "text",     "source": "request", "field": "copayment_amount", "decrypt": true, "x": 100, "y": 83.0, "fontsize": 8 },
+
+      { "type": "centered", "source": "request", "field": "crtby_attendingnephrologist", "decrypt": true, "x": 21.76, "y": 97.5, "w": 79.98, "fontsize": 6 },
+      { "type": "centered", "source": "request", "field": "crtby_attendingtransplantsurgeon", "decrypt": true, "x": 101.91, "y": 97.5, "w": 86.34, "fontsize": 6 },
+      { "type": "boxed_raw", "source": "request", "field": "crtby_attendingnephrologist_accreno", "decrypt": true, "x": 43.70, "y": 116.0, "pitch": 4.146, "fontsize": 8 },
+      { "type": "boxed_raw", "source": "request", "field": "crtby_attendingtransplantsurgeon_accreno", "decrypt": true, "x": 130.03, "y": 116.0, "pitch": 4.159, "fontsize": 8 },
+
+      { "type": "centered", "source": "request", "field": "crtby_patient", "decrypt": true, "x": 23.59, "y": 135.0, "w": 79.55, "fontsize": 6 },
+      { "type": "centered", "source": "request", "field": "crtby_medicaldirectory", "decrypt": true, "x": 103.31, "y": 135.0, "w": 85.57, "fontsize": 6 },
+      { "type": "boxed_raw", "source": "request", "field": "crtby_medicaldirectory_accreno", "decrypt": true, "x": 131.68, "y": 155.5, "pitch": 4.086, "fontsize": 8 }
+    ]
+  }
+}

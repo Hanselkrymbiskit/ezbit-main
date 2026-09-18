@@ -955,7 +955,18 @@ if(!isset($_SESSION['CompleteName']))
                 $ppdf->SetMargins(0, 0, 0);
                 $ppdf->SetAutoPageBreak(false, 0);
                 $ppdfFile = str_replace("\\","//",FCPATH."assets\zben-forms\PreAuth_".str_pad($getPreAuthData['patientinfo']['preauth_type'],2,0,STR_PAD_LEFT).".pdf");
-                if (file_exists($ppdfFile)) 
+
+                // ZPAMS-FIX (2026-09): config-driven field-map loader. If a JSON map exists for
+                // this illness under assets/zben-forms/field-maps/preauth_NN.json, it's decoded
+                // once here and consumed via $pRenderFields() (defined below) inside the page
+                // loop, instead of that illness's coordinates being hardcoded PHP. Illnesses
+                // without a JSON file simply fall through to their existing hardcoded block
+                // unchanged -- this is additive/opt-in per illness, not a behavior change for
+                // any illness that hasn't been migrated.
+                $fieldMapFile = FCPATH."assets/zben-forms/field-maps/preauth_".str_pad($getPreAuthData['patientinfo']['preauth_type'],2,0,STR_PAD_LEFT).".json";
+                $fieldMap = (file_exists($fieldMapFile)) ? json_decode(file_get_contents($fieldMapFile), true) : null;
+
+                if (file_exists($ppdfFile))
                 {
                     $tmpBlobContent = file_get_contents($ppdfFile);
                     preg_match_all('!\d+!', $tmpBlobContent, $matches);
@@ -1049,6 +1060,185 @@ if(!isset($_SESSION['CompleteName']))
                         $ppdf->SetFont('Helvetica','',$fontsize);
                         $ppdf->SetXY($x, $y);
                         $ppdf->Cell($width, 0, (string) $text, 0, 0, 'C');
+                    };
+
+                    // ZPAMS-FIX (2026-09): config-driven field renderer. Reads a field-mapping
+                    // array (normally loaded from a JSON file, one per illness template) and
+                    // draws each field using the exact same $pDecrypt/$pBoxedNumber/$pCentered
+                    // helpers defined above, instead of one hardcoded SetXY()/Write() block per
+                    // field written directly in this method. Purely additive -- not called from
+                    // any existing illness block below. The 5 already-verified illnesses
+                    // (preauth_type 02/03/04/06/14) are untouched; this is for mapping new
+                    // illness templates going forward, where a coordinate fix becomes an edit to
+                    // a JSON file instead of a PHP redeploy.
+                    //
+                    // $fields is an array of entries shaped like:
+                    //   { "type": "checkbox", "source": "checklist", "field": "q_1_1",
+                    //     "x": 174, "y": 157.5 }
+                    // $data is $getPreAuthData itself (patientinfo/checklist/request).
+                    //
+                    // Supported "type" values:
+                    //   text      -- plain Write() of the raw value
+                    //   date      -- Write() of the value formatted as m/d/Y
+                    //   centered  -- $pCentered()
+                    //   boxed     -- $pBoxedNumber() (digit-only, strips non-alphanumeric;
+                    //                needs "pitch")
+                    //   boxed_raw -- one character per box INCLUDING separators, e.g.
+                    //                accreditation numbers where a dash occupies its own
+                    //                printed box (needs "pitch")
+                    //   checkbox  -- writes 'X' at (x,y) only if the field's stored value
+                    //                equals "match" (default 'Y')
+                    //   radio     -- looks up (x,y) from options[<stored value>] and writes
+                    //                'X' there -- for staging grids / coded single-select
+                    //                fields (e.g. FIGO stage, chemo protocol)
+                    // Every type accepts optional "decrypt": true (routes the value through
+                    // $pDecrypt first) and "fontsize" (default 9).
+                    $pRenderFields = function(array $fields, array $data) use ($ppdf, $pDecrypt, $pBoxedNumber, $pCentered, $pFullName, &$pRenderFields) {
+                        foreach ($fields as $f) {
+                            $source = $data[$f['source']] ?? [];
+                            // "fullname" and "facility_name" are computed values, not a single
+                            // stored field -- resolved before the generic $source[$f['field']]
+                            // lookup below (which would find nothing for these).
+                            if ($f['type'] === 'fullname') {
+                                $raw = $pFullName($source, $f['prefix']);
+                            } elseif ($f['type'] === 'facility_name') {
+                                $raw = $this->myutilities->getRef_Desc(104, @$source['healthfacility_code'], false, $f['column'] ?? '');
+                            } elseif ($f['type'] === 'member_toggle') {
+                                $raw = null; // resolved entirely inside its own case below
+                            } else {
+                                $raw = $source[$f['field']] ?? null;
+                            }
+                            if (!empty($f['decrypt'])) { $raw = $pDecrypt($raw); }
+                            $fontsize = $f['fontsize'] ?? 9;
+
+                            switch ($f['type']) {
+                                case 'text':
+                                    if ($raw === null || $raw === '') break;
+                                    $ppdf->SetFont('Helvetica','',$fontsize);
+                                    $ppdf->SetXY($f['x'], $f['y']);
+                                    $ppdf->Write(0, (string) $raw);
+                                    break;
+
+                                case 'date':
+                                    if (empty($raw)) break;
+                                    $ppdf->SetFont('Helvetica','',$fontsize);
+                                    $ppdf->SetXY($f['x'], $f['y']);
+                                    $ppdf->Write(0, date('m/d/Y', strtotime($raw)));
+                                    break;
+
+                                case 'centered':
+                                case 'fullname':
+                                case 'facility_name':
+                                    if ($raw === null || $raw === '') break;
+                                    // ZPAMS-FIX (2026-09): added migrating CABG/Breast Cancer/Kidney.
+                                    // Breast Cancer and Kidney's page-1 blocks duplicate the shared
+                                    // page-1 header's Health Facility/Address write with their own
+                                    // slightly-offset coordinates (a pre-existing quirk in the original
+                                    // code, not introduced here) -- those writes are plain left-aligned
+                                    // Write() calls, not $pCentered()'s boxed/centered layout. "align":
+                                    // "left" reproduces that exact original behavior; omitted/"center"
+                                    // keeps every existing mapped field (Cervical, Prostate demo, CABG's
+                                    // request-page facility_name) unchanged.
+                                    if (($f['align'] ?? 'center') === 'left') {
+                                        $ppdf->SetFont('Helvetica','',$fontsize);
+                                        $ppdf->SetXY($f['x'], $f['y']);
+                                        $ppdf->Write(0, (string) $raw);
+                                    } else {
+                                        $pCentered($raw, $f['x'], $f['y'], $f['w'], $fontsize);
+                                    }
+                                    break;
+
+                                case 'boxed':
+                                    if (empty($raw)) break;
+                                    $pBoxedNumber($raw, $f['x'], $f['y'], $f['pitch'] ?? 3.9, $fontsize);
+                                    break;
+
+                                case 'boxed_raw':
+                                    if (empty($raw)) break;
+                                    $ppdf->SetFont('Helvetica','',$fontsize);
+                                    foreach (str_split((string) $raw) as $i => $ch) {
+                                        $ppdf->SetXY($f['x'] + ($i * $f['pitch']), $f['y']);
+                                        $ppdf->Write(0, $ch);
+                                    }
+                                    break;
+
+                                // "mark" -- unconditionally writes fixed text (default 'X') at
+                                // (x,y). For slots like the "Same as Patient" checkbox where the
+                                // surrounding member_toggle branch has already decided this slot
+                                // applies -- no per-field value check needed.
+                                case 'mark':
+                                    $ppdf->SetFont('Helvetica','',$fontsize);
+                                    $ppdf->SetXY($f['x'], $f['y']);
+                                    $ppdf->Write(0, $f['text'] ?? 'X');
+                                    break;
+
+                                case 'checkbox':
+                                    // ZPAMS-FIX (2026-09): added migrating Kidney Transplantation.
+                                    // "match" can be a single value (all prior illnesses) or an array
+                                    // of acceptable values -- Kidney's q_1_10 row marks the same box for
+                                    // either 'N' or 'NA' (original: `elseif (in_array($cl['q_1_10'],
+                                    // ['N','NA']))`). (array) wraps a scalar match transparently so
+                                    // every existing single-value mapping is unaffected.
+                                    $matches = array_map('strval', (array) ($f['match'] ?? 'Y'));
+                                    if (!in_array((string) $raw, $matches, true)) break;
+                                    $ppdf->SetFont('Helvetica','',$fontsize);
+                                    $ppdf->SetXY($f['x'], $f['y']);
+                                    $ppdf->Write(0, 'X');
+                                    break;
+
+                                case 'radio':
+                                    $key = (string) $raw;
+                                    if (!isset($f['options'][$key])) break;
+                                    [$rx, $ry] = $f['options'][$key];
+                                    $ppdf->SetFont('Helvetica','',$fontsize);
+                                    $ppdf->SetXY($rx, $ry);
+                                    $ppdf->Write(0, 'X');
+                                    break;
+
+                                // ZPAMS-FIX (2026-09): added migrating the 5 already-mapped illnesses.
+                                // "boxed_segments" -- for PhilHealth ID / accreditation rows where the
+                                // digit run is split by printed dashes into groups with their own start
+                                // x and (usually matching) pitch, e.g. Prostate's 2-9-1 digit ID boxes.
+                                // "segments": [{ "start":0, "length":2, "x":110.2, "pitch":5.3 }, ...]
+                                // (start/length index into the digit-only string, same stripping rule
+                                // as "boxed").
+                                case 'boxed_segments':
+                                    $digits = preg_replace('/[^A-Za-z0-9]/', '', (string) $raw);
+                                    if ($digits === '') break;
+                                    $ppdf->SetFont('Helvetica','',$fontsize);
+                                    foreach ($f['segments'] as $seg) {
+                                        $part = substr($digits, $seg['start'], $seg['length']);
+                                        foreach (str_split($part) as $i => $ch) {
+                                            $ppdf->SetXY($seg['x'] + ($i * ($seg['pitch'] ?? $f['pitch'] ?? 3.9)), $seg['y'] ?? $f['y']);
+                                            $ppdf->Write(0, $ch);
+                                        }
+                                    }
+                                    break;
+
+                                // "member_toggle" -- the "Same as Patient" pattern common to all 5
+                                // mapped illnesses: if the condition field equals "match" (default
+                                // 'Y'), just mark/write the "same" slot; otherwise render the member's
+                                // own name + PhilHealth ID using the same field types as everywhere
+                                // else. "same" and "different.member_name"/"different.member_id" each
+                                // take a normal field-entry shape (any type above).
+                                case 'member_toggle':
+                                    $condVal = (string) ($data[$f['source']][$f['conditionField']] ?? '');
+                                    $match = $f['match'] ?? 'Y';
+                                    if ($condVal === (string) $match) {
+                                        $pRenderFields([$f['same']], $data);
+                                    } else {
+                                        if (isset($f['different']['member_name'])) { $pRenderFields([$f['different']['member_name']], $data); }
+                                        if (isset($f['different']['member_id'])) { $pRenderFields([$f['different']['member_id']], $data); }
+                                        // ZPAMS-FIX (2026-09): added migrating Kidney Transplantation.
+                                        // Kidney's "different" branch also prints the member's OWN sex
+                                        // checkbox (M/F) -- a third field the original two named slots
+                                        // don't cover. "extra" takes a plain list of field entries,
+                                        // rendered only in the non-same branch, same as member_name/id.
+                                        if (isset($f['different']['extra'])) { $pRenderFields($f['different']['extra'], $data); }
+                                    }
+                                    break;
+                            }
+                        }
                     };
 
                     // $ppageCount = $ppdf->setSourceFile($ppdfFile);
@@ -1189,158 +1379,37 @@ if(!isset($_SESSION['CompleteName']))
                                 }
                             }
 
-                            // ZPAMS-FIX (2026-09): field mapping for preauth_type 4 (Cervical Cancer),
-                            // added as part of the same rollout as Prostate CA (14). Coordinates
-                            // measured empirically against PreAuth_04.pdf (A4, distinct from Prostate
-                            // CA's Letter-size template) via the same FPDI+Ghostscript gridline method.
-                            if ((int) @$getPreAuthData['patientinfo']['preauth_type'] == 4) {
-                                $pi = $getPreAuthData['patientinfo'];
+                            // ZPAMS-FIX (2026-09): Cervical Cancer (preauth_type 4) field mapping
+                            // driven by the config engine + assets/zben-forms/field-maps/preauth_04.json.
+                            if ((int) @$getPreAuthData['patientinfo']['preauth_type'] == 4 && $fieldMap) {
+                                $pRenderFields($fieldMap['pages']['1'], $getPreAuthData);
+
+                                // FIGO staging's date needs the SAME row Y as whichever stage q_2_1
+                                // selected -- a lookup tied to another field's value, not expressible
+                                // as a flat JSON field entry, so it stays as a small coupled snippet.
                                 $cl = @$getPreAuthData['checklist'];
-
-                                $pCentered($pFullName($pi,'patient'), 50, 73, 98, 7);
-                                $ppdf->SetFont('Helvetica','',9);
-                                if (@$pi['patient_sex'] == 'M') { $ppdf->SetXY(153, 75); $ppdf->Write(0,'X'); }
-                                else { $ppdf->SetXY(167, 75); $ppdf->Write(0,'X'); }
-                                $pBoxedNumber(@$pi['patient_philhealthno'], 107.6, 80, 5.55);
-
-                                if (@$pi['patient_is_member'] == 'Y') {
-                                    $ppdf->SetXY(53, 89); $ppdf->Write(0,'X');
-                                } else {
-                                    $pCentered($pFullName($pi,'member'), 50, 96, 98, 7);
-                                    $pBoxedNumber(@$pi['member_philhealthno'], 107.6, 102, 5.55);
-                                }
-
-                                if (@$pi['fulfilled_selection_criteria'] == 'Y') { $ppdf->SetXY(82,111.5); $ppdf->Write(0,'X'); }
-                                else {
-                                    $ppdf->SetXY(82,119.5); $ppdf->Write(0,'X');
-                                    $ppdf->SetXY(95,126); $ppdf->Write(0, @$pi['fulfilled_selection_criteria_reason']);
-                                }
-
-                                // 5 QUALIFICATIONS items, YES-only column
-                                $qualY = ['q_1_1'=>156,'q_1_2'=>161,'q_1_3'=>166,'q_1_4'=>171,'q_1_5'=>176];
-                                foreach ($qualY as $fld => $ry) {
-                                    if (@$cl[$fld] == 'Y') { $ppdf->SetXY(163, $ry); $ppdf->Write(0,'X'); }
-                                }
-
-                                // FIGO Clinical Staging -- single-select radio (q_2_1 holds the chosen
-                                // stage's code 1-9, matching ref_zben_cc_stages) rather than one Y/N
-                                // field per row, so only the matching row gets marked.
                                 $figoY = [1=>197,2=>202,3=>207,4=>211.5,5=>216.5,6=>221.5,7=>226.5,8=>231.5,9=>236.5];
                                 $stageCode = (int) @$cl['q_2_1'];
-                                if (isset($figoY[$stageCode])) {
-                                    $ppdf->SetXY(103, $figoY[$stageCode]); $ppdf->Write(0,'X');
-                                    if (!empty(@$cl['q_2_1_date'])) {
-                                        $ppdf->SetXY(140, $figoY[$stageCode]);
-                                        $ppdf->Write(0, date('m/d/Y', strtotime($cl['q_2_1_date'])));
-                                    }
+                                if (isset($figoY[$stageCode]) && !empty(@$cl['q_2_1_date'])) {
+                                    $ppdf->SetFont('Helvetica','',9);
+                                    $ppdf->SetXY(140, $figoY[$stageCode]);
+                                    $ppdf->Write(0, date('m/d/Y', strtotime($cl['q_2_1_date'])));
                                 }
-
-                                $pCentered($pDecrypt(@$cl['crtby_attendingqynecologiconcologist']), 116, 248, 68, 7);
-                                $pBoxedNumber($pDecrypt(@$cl['crtby_attendingqynecologiconcologist_accreno']), 126.9, 260, 4.15);
                             }
 
-                            // ZPAMS-FIX (2026-09): field mapping for preauth_type 3 (CABG), added as
-                            // part of the same rollout. Unlike Prostate CA / Cervical CA, this
-                            // template's checklist spans TWO physical pages (1 and 2) -- page 1 holds
-                            // only the standalone age qualification and checklist items 1-2; items 3-4,
-                            // diagnostics, and the physician/patient signatures live on page 2.
-                            if ((int) @$getPreAuthData['patientinfo']['preauth_type'] == 3) {
-                                $pi = $getPreAuthData['patientinfo'];
-                                $cl = @$getPreAuthData['checklist'];
-
-                                $pCentered($pFullName($pi,'patient'), 50, 83.5, 98, 7);
-                                $ppdf->SetFont('Helvetica','',9);
-                                if (@$pi['patient_sex'] == 'M') { $ppdf->SetXY(153, 83.5); $ppdf->Write(0,'X'); }
-                                else { $ppdf->SetXY(169, 83.5); $ppdf->Write(0,'X'); }
-                                $pBoxedNumber(@$pi['patient_philhealthno'], 107.6, 90, 5.55);
-
-                                if (@$pi['patient_is_member'] == 'Y') {
-                                    $ppdf->SetXY(52.5, 97.5); $ppdf->Write(0,'X');
-                                } else {
-                                    $pCentered($pFullName($pi,'member'), 50, 107, 98, 7);
-                                    $pBoxedNumber(@$pi['member_philhealthno'], 107.6, 114, 5.55);
-                                }
-
-                                if (@$pi['fulfilled_selection_criteria'] == 'Y') { $ppdf->SetXY(82,128.5); $ppdf->Write(0,'X'); }
-                                else {
-                                    $ppdf->SetXY(82,133.5); $ppdf->Write(0,'X');
-                                    $ppdf->SetXY(95,140); $ppdf->Write(0, @$pi['fulfilled_selection_criteria_reason']);
-                                }
-
-                                if (@$cl['q_1_age'] == 'Y') { $ppdf->SetXY(167,173); $ppdf->Write(0,'X'); }
-                                if (@$cl['q_2_1'] == 'Y')   { $ppdf->SetXY(167,205); $ppdf->Write(0,'X'); }
-                                $qualY2 = ['q_2_2_a'=>226,'q_2_2_b'=>236,'q_2_2_c'=>246,'q_2_2_d'=>256];
-                                foreach ($qualY2 as $fld => $ry) {
-                                    if (@$cl[$fld] == 'Y') { $ppdf->SetXY(167, $ry); $ppdf->Write(0,'X'); }
-                                }
+                            // ZPAMS-FIX (2026-09): CABG (preauth_type 3) field mapping driven by the
+                            // config engine + assets/zben-forms/field-maps/preauth_03.json.
+                            if ((int) @$getPreAuthData['patientinfo']['preauth_type'] == 3 && $fieldMap) {
+                                $pRenderFields($fieldMap['pages']['1'], $getPreAuthData);
                             }
                         }
 
-                        if ($pageNo == 2 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 3) {
-                            $cl = @$getPreAuthData['checklist'];
-
-                            $qualY3 = ['q_2_3_a'=>45.6,'q_2_3_b'=>52.5,'q_2_4'=>62.5];
-                            foreach ($qualY3 as $fld => $ry) {
-                                if (@$cl[$fld] == 'Y') { $ppdf->SetXY(167, $ry); $ppdf->Write(0,'X'); }
-                            }
-
-                            $diagRows2 = [['q_3_1','q_3_1_date', 97], ['q_3_2','q_3_2_date', 109.5]];
-                            foreach ($diagRows2 as $r) {
-                                [$yk,$dk,$ry] = $r;
-                                if (@$cl[$yk] == 'Y') {
-                                    $ppdf->SetXY(150, $ry); $ppdf->Write(0,'X');
-                                    if (!empty(@$cl[$dk])) { $ppdf->SetXY(172, $ry); $ppdf->Write(0, date('m/d/Y', strtotime($cl[$dk]))); }
-                                }
-                            }
-
-                            $pCentered($pDecrypt(@$cl['crtby_attendingcardiologist']), 8, 146.5, 100, 6);
-                            $pCentered($pDecrypt(@$cl['crtby_attendingcardiovascularsurgeon']), 115, 146.5, 90, 6);
-                            $pBoxedNumber($pDecrypt(@$cl['crtby_attendingcardiologist_accreno']), 47.5, 162.7, 4.15);
-                            $pBoxedNumber($pDecrypt(@$cl['crtby_attendingcardiovascularsurgeon_accreno']), 134.0, 162.7, 4.15);
-
-                            // ZPAMS-FIX (2026-09): the "Conforme by: Patient" box on this page sits
-                            // in the RIGHT column (matching the medical-director-style box seen on
-                            // every other template's request page), not the left -- an earlier
-                            // diagnostic pass only validated the Y coordinate here (it probed a single
-                            // fixed x for every candidate row), so the x=8 left-column guess went
-                            // unverified and landed outside any box.
-                            $pCentered($pDecrypt(@$cl['crtby_patient']), 115, 191.5, 90, 7);
-                            if (!empty(@$cl['crtby_patient_signeddate'])) {
-                                $ppdf->SetFont('Helvetica','',8);
-                                $ppdf->SetXY(160, 202.5); $ppdf->Write(0, date('m/d/Y', strtotime($cl['crtby_patient_signeddate'])));
-                            }
+                        if ($pageNo == 2 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 3 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['2'], $getPreAuthData);
                         }
 
-                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 3) {
-                            $pi = $getPreAuthData['patientinfo'];
-                            $rq = @$getPreAuthData['request'];
-
-                            $ppdf->SetFont('Helvetica','',9);
-                            $ppdf->SetXY(135, 52);
-                            $ppdf->Write(0, !empty(@$pi['submitted_datetime']) ? date('m/d/Y', strtotime($pi['submitted_datetime'])) : '');
-
-                            $pCentered($pFullName($pi,'patient'), 20, 68, 45, 9);
-                            $pCentered($this->myutilities->getRef_Desc(104,@$pi['healthfacility_code']), 75, 68, 110, 9);
-
-                            // ZPAMS-FIX (2026-09): was `else`, which marked "With co-payment" for ANY
-                            // non-'wocp' value including an empty/unset field -- a case with no
-                            // copayment answer at all got a false "With co-payment" mark. The wizard's
-                            // own radio only ever stores 'wocp' or 'wcp' (preauth_request/preauth_NN.php);
-                            // gating on 'wcp' explicitly leaves both boxes blank when truly unanswered.
-                            if (@$rq['copayment'] == 'wocp') { $ppdf->SetXY(27.6, 97); $ppdf->Write(0,'X'); }
-                            elseif (@$rq['copayment'] == 'wcp') {
-                                $ppdf->SetXY(27.6, 103); $ppdf->Write(0,'X');
-                                $ppdf->SetXY(95, 103); $ppdf->Write(0, $pDecrypt(@$rq['with_copayment_purpose']));
-                            }
-
-                            $pCentered($pDecrypt(@$rq['crtby_attendingcardiologist']), 8, 119, 100, 6);
-                            $pCentered($pDecrypt(@$rq['crtby_attendingcardiovascularsurgeon']), 115, 119, 90, 6);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingcardiologist_accreno']), 47.5, 135.5, 4.15);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingcardiovascularsurgeon_accreno']), 134.0, 135.5, 4.15);
-
-                            $pCentered($pDecrypt(@$rq['crtby_patient']), 8, 150, 100, 7);
-                            $pCentered($pDecrypt(@$rq['crtby_medicaldirectory']), 115, 150, 90, 6);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_medicaldirectory_accreno']), 134.0, 168, 4.15);
+                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 3 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['3'], $getPreAuthData);
                         }
 
                         // ZPAMS-FIX (2026-09): field mapping for preauth_type 2 (Breast Cancer).
@@ -1353,161 +1422,20 @@ if(!isset($_SESSION['CompleteName']))
                         // empirically per page; the deep chemotherapy-protocol regimen sub-choice on
                         // page 2 is left unmapped (not enough time to verify its DB value encoding
                         // against the 3 named regimens) -- everything else is covered.
-                        if ($pageNo == 1 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 2) {
-                            $pi = $getPreAuthData['patientinfo'];
-                            $cl = @$getPreAuthData['checklist'];
-
-                            $ppdf->SetXY(70, 52.2); $ppdf->Write(0,$this->myutilities->getRef_Desc(104,@$pi['healthfacility_code']));
-                            $ppdf->SetXY(70, 59.3); $ppdf->Write(0,$this->myutilities->getRef_Desc(104,@$pi['healthfacility_code'],false,'inst_address_street'));
-
-                            $pCentered($pFullName($pi,'patient'), 50, 70, 98, 7);
-                            $ppdf->SetFont('Helvetica','',9);
-                            if (@$pi['patient_sex'] == 'M') { $ppdf->SetXY(153, 72.5); $ppdf->Write(0,'X'); }
-                            else { $ppdf->SetXY(169, 72.5); $ppdf->Write(0,'X'); }
-                            // ZPAMS-FIX (2026-09): this template's PhilHealth ID boxes start at
-                            // x=113.9 (measured via pixel scan) -- noticeably further right than every
-                            // other template's ID row, confirmed after the shared x=107.6 assumption
-                            // rendered digits drifting outside the box outlines.
-                            $pBoxedNumber(@$pi['patient_philhealthno'], 113.9, 79.5, 4.2);
-
-                            if (@$pi['patient_is_member'] == 'Y') {
-                                $ppdf->SetFont('Helvetica','',7);
-                                $ppdf->SetXY(50, 99); $ppdf->Write(0, 'SAME AS ABOVE');
-                            } else {
-                                $pCentered($pFullName($pi,'member'), 50, 99, 98, 7);
-                                $pBoxedNumber(@$pi['member_philhealthno'], 113.9, 106.6, 4.2);
-                            }
-
-                            $hptRows = [
-                                'hpt_1' => ['y'=>136.1, 'specify'=>['hpt_1_specify', 71.2], 'date'=>['hpt_1_date', 164.4]],
-                                'hpt_2' => ['y'=>142.4, 'date'=>['hpt_2_date', 164.4]],
-                                'hpt_3' => ['y'=>148.6, 'date'=>['hpt_3_date', 164.4]],
-                                'hpt_4' => ['y'=>154.9, 'specify'=>['hpt_4_specify', 86.4], 'date'=>['hpt_4_date', 164.4]],
-                            ];
-                            $ppdf->SetFont('Helvetica','',8);
-                            foreach ($hptRows as $fld => $cfg) {
-                                if (@$cl[$fld] == 'Y') {
-                                    $ppdf->SetXY(25.5, $cfg['y']); $ppdf->Write(0,'X');
-                                    if (isset($cfg['specify']) && !empty(@$cl[$cfg['specify'][0]])) {
-                                        $ppdf->SetXY($cfg['specify'][1], $cfg['y']+3); $ppdf->Write(0, @$cl[$cfg['specify'][0]]);
-                                    }
-                                    if (!empty(@$cl[$cfg['date'][0]])) {
-                                        $ppdf->SetXY($cfg['date'][1], $cfg['y']); $ppdf->Write(0, date('m/d/Y', strtotime($cl[$cfg['date'][0]])));
-                                    }
-                                }
-                            }
-
-                            if (@$cl['menstrual'] == 'pre') { $ppdf->SetXY(25.5, 181.5); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['menstrual'] == 'post') { $ppdf->SetXY(105.8, 181.5); $ppdf->Write(0,'X'); }
-
-                            $her2Y = ['0'=>25.5, '2'=>83.8, '3'=>134.5];
-                            $her2Key = (string) @$cl['HER2'];
-                            if (isset($her2Y[$her2Key])) { $ppdf->SetXY($her2Y[$her2Key], 193.9); $ppdf->Write(0,'X'); }
-
-                            if (@$cl['laterality_r'] == 'Y') { $ppdf->SetXY(25.5, 210.2); $ppdf->Write(0,'X'); }
-                            if (@$cl['laterality_l'] == 'Y') { $ppdf->SetXY(109.3, 210.2); $ppdf->Write(0,'X'); }
-                            $stageY = [1=>215.3,2=>220.2,3=>225.1,4=>230,5=>234.9,6=>239.8,7=>244.7,8=>249.6,9=>254.5];
-                            $rStage = (int) @$cl['clinical_staging_r'];
-                            $lStage = (int) @$cl['clinical_staging_l'];
-                            if (isset($stageY[$rStage])) { $ppdf->SetXY(25.5, $stageY[$rStage]); $ppdf->Write(0,'X'); }
-                            if (isset($stageY[$lStage])) { $ppdf->SetXY(109.3, $stageY[$lStage]); $ppdf->Write(0,'X'); }
+                        // ZPAMS-FIX (2026-09): Breast Cancer (preauth_type 2) field mapping driven by
+                        // the config engine + assets/zben-forms/field-maps/preauth_02.json (all 4
+                        // pages, including the Cytotoxic Chemotherapy Protocol sub-choice).
+                        if ($pageNo == 1 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 2 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['1'], $getPreAuthData);
                         }
-
-                        if ($pageNo == 2 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 2) {
-                            $cl = @$getPreAuthData['checklist'];
-                            $ppdf->SetFont('Helvetica','',8);
-
-                            // ZPAMS-FIX (2026-09): atp_surgery and atp_cchemotherapy both store 'A'
-                            // (Adjuvant) / 'N' (Neoadjuvant) -- confirmed against the wizard's own
-                            // checklist view (preauth_checklist/preauth_02.php), which radios both
-                            // fields to value="A"/value="N". This code was checking for 'adj'/'neoadj',
-                            // which those fields never actually contain, so neither Surgery's nor
-                            // Chemotherapy's Adjuvant/Neoadjuvant selection was ever being marked on
-                            // the generated PDF.
-                            if (@$cl['atp_surgery'] == 'A') { $ppdf->SetXY(115.9, 39.4); $ppdf->Write(0,'X'); }
-                            if (@$cl['atp_surgery'] == 'N') { $ppdf->SetXY(142.6, 39.4); $ppdf->Write(0,'X'); }
-                            if (@$cl['atp_hormonaltherapy'] == 'Y') { $ppdf->SetXY(27.6, 48.9); $ppdf->Write(0,'X'); }
-                            if (@$cl['atp_cchemotherapy'] == 'A') { $ppdf->SetXY(115.9, 56.7); $ppdf->Write(0,'X'); }
-                            if (@$cl['atp_cchemotherapy'] == 'N') { $ppdf->SetXY(142.6, 56.7); $ppdf->Write(0,'X'); }
-
-                            // Cytotoxic Chemotherapy -- Protocol sub-choice (previously unmapped).
-                            // Field values confirmed against the wizard view: ACT/ACP/TCB. Coordinates
-                            // verified via rendered marker overlay against PreAuth_02.pdf page 2.
-                            if (@$cl['atp_cchemotherapy_protocol'] == 'ACT') { $ppdf->SetXY(115.9, 76.2); $ppdf->Write(0,'X'); }
-                            if (@$cl['atp_cchemotherapy_protocol'] == 'ACP') { $ppdf->SetXY(115.9, 95.7); $ppdf->Write(0,'X'); }
-                            if (@$cl['atp_cchemotherapy_protocol'] == 'TCB') { $ppdf->SetXY(115.9, 115.2); $ppdf->Write(0,'X'); }
-
-                            if (@$cl['atp_targettherapy'] == 'Y') { $ppdf->SetXY(27.6, 127.6); $ppdf->Write(0,'X'); }
-                            if (!empty(@$cl['atp_targettherapy_specify'])) { $ppdf->SetXY(150, 134.5); $ppdf->Write(0, @$cl['atp_targettherapy_specify']); }
-                            if (@$cl['atp_surveillance'] == 'Y') { $ppdf->SetXY(27.6, 147.7); $ppdf->Write(0,'X'); }
+                        if ($pageNo == 2 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 2 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['2'], $getPreAuthData);
                         }
-
-                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 2) {
-                            $pi = $getPreAuthData['patientinfo'];
-                            $cl = @$getPreAuthData['checklist'];
-
-                            $ppdf->SetXY(70, 28.8); $ppdf->Write(0,$this->myutilities->getRef_Desc(104,@$pi['healthfacility_code']));
-                            $ppdf->SetXY(70, 38.1); $ppdf->Write(0,$this->myutilities->getRef_Desc(104,@$pi['healthfacility_code'],false,'inst_address_street'));
-
-                            $pCentered($pFullName($pi,'patient'), 50, 46.5, 98, 7);
-                            $ppdf->SetFont('Helvetica','',9);
-                            if (@$pi['patient_sex'] == 'M') { $ppdf->SetXY(153, 53.4); $ppdf->Write(0,'X'); }
-                            else { $ppdf->SetXY(169, 53.4); $ppdf->Write(0,'X'); }
-                            $pBoxedNumber(@$pi['patient_philhealthno'], 113.9, 60.3, 4.2);
-
-                            if (@$pi['patient_is_member'] == 'Y') {
-                                $ppdf->SetFont('Helvetica','',7);
-                                $ppdf->SetXY(50, 80); $ppdf->Write(0, 'SAME AS ABOVE');
-                            } else {
-                                $pCentered($pFullName($pi,'member'), 50, 80, 98, 7);
-                                $pBoxedNumber(@$pi['member_philhealthno'], 113.9, 87.1, 4.2);
-                            }
-
-                            $pCentered($pDecrypt(@$cl['crtby_attendingmedoncologist']), 5, 124.5, 105, 6);
-                            $pCentered($pDecrypt(@$cl['crtby_attendingsurgeon']), 112, 124.5, 105, 6);
-                            $pBoxedNumber($pDecrypt(@$cl['crtby_attendingmedoncologist_accreno']), 38, 137, 4.5);
-                            $pBoxedNumber($pDecrypt(@$cl['crtby_attendingsurgeon_accreno']), 134.5, 137, 4.3);
-
-                            $pCentered($pDecrypt(@$cl['crtby_attendingradoncologist']), 5, 176.5, 105, 6);
-                            $pBoxedNumber($pDecrypt(@$cl['crtby_attendingradoncologist_accreno']), 38, 189, 4.5);
-
-                            $pCentered($pDecrypt(@$cl['crtby_patient']), 112, 176.5, 105, 7);
-                            if (!empty(@$cl['crtby_patient_signeddate'])) {
-                                $ppdf->SetFont('Helvetica','',7);
-                                $ppdf->SetXY(163, 192.5); $ppdf->Write(0, date('m/d/Y', strtotime($cl['crtby_patient_signeddate'])));
-                            }
+                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 2 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['3'], $getPreAuthData);
                         }
-
-                        if ($pageNo == 4 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 2) {
-                            $pi = $getPreAuthData['patientinfo'];
-                            $rq = @$getPreAuthData['request'];
-
-                            $ppdf->SetFont('Helvetica','',9);
-                            $ppdf->SetXY(90, 27.5);
-                            $ppdf->Write(0, !empty(@$pi['submitted_datetime']) ? date('m/d/Y', strtotime($pi['submitted_datetime'])) : '');
-
-                            $pCentered($pFullName($pi,'patient'), 15, 37, 90, 8);
-                            $pCentered($this->myutilities->getRef_Desc(104,@$pi['healthfacility_code']), 100, 37, 90, 8);
-
-                            // ZPAMS-FIX (2026-09): see the same fix's note on the CABG request page --
-                            // gate on 'wcp' explicitly rather than "anything not 'wocp'".
-                            if (@$rq['copayment'] == 'wocp') { $ppdf->SetXY(18.6, 69); $ppdf->Write(0,'X'); }
-                            elseif (@$rq['copayment'] == 'wcp') {
-                                $ppdf->SetXY(18.6, 74); $ppdf->Write(0,'X');
-                                $ppdf->SetXY(30, 80); $ppdf->Write(0, $pDecrypt(@$rq['with_copayment_purpose']));
-                            }
-
-                            $pCentered($pDecrypt(@$rq['crtby_attendingmedoncologist']), 5, 93, 105, 6);
-                            $pCentered($pDecrypt(@$rq['crtby_attendingsurgeon']), 112, 93, 95, 6);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingmedoncologist_accreno']), 37.8, 108, 4.5);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingsurgeon_accreno']), 134.5, 108, 4.3);
-
-                            $pCentered($pDecrypt(@$rq['crtby_attendingradoncologist']), 5, 127, 105, 6);
-                            $pCentered($pDecrypt(@$rq['crtby_medicaldirectory']), 112, 127, 95, 6);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingradoncologist_accreno']), 37.8, 149, 4.5);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_medicaldirectory_accreno']), 134.5, 149, 4.3);
-
-                            $pCentered($pDecrypt(@$rq['crtby_patient']), 112, 168, 95, 7);
+                        if ($pageNo == 4 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 2 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['4'], $getPreAuthData);
                         }
 
                         // ZPAMS-FIX (2026-09): field mapping for preauth_type 6 (Kidney
@@ -1531,171 +1459,26 @@ if(!isset($_SESSION['CompleteName']))
                         // M_preauth_form_flds::preauth_06) -- they are distinct, conditionally-
                         // applicable clinical attestations that the wizard never collects, so there is
                         // no data to print and nothing to guess at.
-                        if ($pageNo == 1 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6) {
-                            $pi = $getPreAuthData['patientinfo'];
-
-                            $ppdf->SetXY(70, 52.2); $ppdf->Write(0,$this->myutilities->getRef_Desc(104,@$pi['healthfacility_code']));
-                            $ppdf->SetXY(70, 59.3); $ppdf->Write(0,$this->myutilities->getRef_Desc(104,@$pi['healthfacility_code'],false,'inst_address_street'));
-
-                            $pCentered($pFullName($pi,'patient'), 50, 70, 98, 7);
-                            $ppdf->SetFont('Helvetica','',9);
-                            if (@$pi['patient_sex'] == 'M') { $ppdf->SetXY(153, 72.5); $ppdf->Write(0,'X'); }
-                            else { $ppdf->SetXY(169, 72.5); $ppdf->Write(0,'X'); }
-                            $pBoxedNumber(@$pi['patient_philhealthno'], 113.9, 79.5, 4.2);
-
-                            if (@$pi['patient_is_member'] == 'Y') {
-                                $ppdf->SetXY(25.5, 89.3); $ppdf->Write(0,'X');
-                            } else {
-                                $pCentered($pFullName($pi,'member'), 50, 93, 98, 7);
-                                if (@$pi['member_sex'] == 'M') { $ppdf->SetXY(153, 93); $ppdf->Write(0,'X'); }
-                                else { $ppdf->SetXY(169, 93); $ppdf->Write(0,'X'); }
-                                $pBoxedNumber(@$pi['member_philhealthno'], 113.9, 103, 4.2);
-                            }
-
-                            $cl = @$getPreAuthData['checklist'];
-
-                            // History of Previous Kidney Transplantation
-                            if (@$cl['q_0_1'] == 'NA') { $ppdf->SetXY(141.5, 113.5); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_0_2'] == '1') { $ppdf->SetXY(24.5, 119.4); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_0_2'] == '2') { $ppdf->SetXY(112.3, 119.8); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_0_2_1'] == '1') { $ppdf->SetXY(29.5, 123.7); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_0_2_1'] == '2') { $ppdf->SetXY(61.5, 123.7); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_0_3'] == 'Y') { $ppdf->SetXY(24.5, 130.8); $ppdf->Write(0,'X'); }
-                            if (!empty(@$cl['q_0_3_date'])) {
-                                $ppdf->SetFont('Helvetica','',8);
-                                $ppdf->SetXY(113.1, 130.3); $ppdf->Write(0, date('m/d/Y', strtotime($cl['q_0_3_date'])));
-                                $ppdf->SetFont('Helvetica','',9);
-                            }
-                            if (@$cl['q_0_3_1'] == '1') { $ppdf->SetXY(30.5, 135.6); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_0_3_1'] == '2') { $ppdf->SetXY(47.3, 135.6); $ppdf->Write(0,'X'); }
-
-                            // Kidney Transplantation Procedure grid (Type of Transplantation /
-                            // Immunosuppression / Donor Nephrectomy / Organ Preservation)
-                            if (@$cl['q_0_4'] == '1') { $ppdf->SetXY(25.5, 173.3); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_0_4'] == '2') { $ppdf->SetXY(23.5, 204.5); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_0_4_1'] == '1') { $ppdf->SetXY(30, 176.1); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_0_4_1'] == '2') { $ppdf->SetXY(30, 180.9); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_0_5'] == '1') { $ppdf->SetXY(72.5, 171.6); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_0_5'] == '2') { $ppdf->SetXY(72.5, 181.3); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_0_6'] == '1') { $ppdf->SetXY(127.5, 170.5); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_0_6'] == '2') { $ppdf->SetXY(127.5, 189.7); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_0_7'] == '1') { $ppdf->SetXY(127.5, 212.1); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_0_7'] == '2') { $ppdf->SetXY(127.5, 216.9); $ppdf->Write(0,'X'); }
-
-                            // Selection Criteria 1.1 - 1.2 (continues on pages 2 and 4)
-                            if (@$cl['q_1_1'] == 'Y') { $ppdf->SetXY(163.0, 246.6); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_2'] == 'Y') { $ppdf->SetXY(163.0, 259.6); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_2'] == 'NA') { $ppdf->SetXY(175.5, 259.6); $ppdf->Write(0,'X'); }
+                        // ZPAMS-FIX (2026-09): Kidney Transplantation (preauth_type 6) field mapping
+                        // driven by the config engine + assets/zben-forms/field-maps/preauth_06.json
+                        // (all 6 pages).
+                        if ($pageNo == 1 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['1'], $getPreAuthData);
                         }
-
-                        if ($pageNo == 2 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6) {
-                            $cl = @$getPreAuthData['checklist'];
-
-                            if (@$cl['q_1_3'] == 'Y') { $ppdf->SetXY(163.0, 47.6); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_3'] == 'NA') { $ppdf->SetXY(175.5, 47.6); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_4'] == 'Y') { $ppdf->SetXY(163.0, 61.1); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_5'] == 'Y') { $ppdf->SetXY(163.0, 69.2); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_6'] == 'N') { $ppdf->SetXY(29.5, 82.1); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_6'] == 'Y') { $ppdf->SetXY(29.5, 86.9); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_6_1'] == 'Y') { $ppdf->SetXY(163.0, 96.9); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_6_1'] == 'NA') { $ppdf->SetXY(175.0, 96.9); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_6_2'] == 'Y') { $ppdf->SetXY(163.0, 105.0); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_6_2'] == 'NA') { $ppdf->SetXY(175.0, 105.0); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_6_2_1'] == 'Y') { $ppdf->SetXY(163.0, 114.8); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_6_2_2'] == 'Y') { $ppdf->SetXY(163.0, 119.9); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_6_3'] == 'Y') { $ppdf->SetXY(163.0, 129.4); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_6_4'] == 'Y') { $ppdf->SetXY(163.0, 134.4); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_7'] == 'Y') { $ppdf->SetXY(163.0, 148.8); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_8'] == 'Y') { $ppdf->SetXY(163.0, 177.8); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_9'] == 'N') { $ppdf->SetXY(29.5, 204.1); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_9'] == 'Y') { $ppdf->SetXY(29.5, 208.9); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_10'] == 'Y') { $ppdf->SetXY(163.0, 215.7); $ppdf->Write(0,'X'); }
-                            elseif (in_array(@$cl['q_1_10'], ['N','NA'])) { $ppdf->SetXY(175.0, 215.7); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_10_1'] == 'Y') { $ppdf->SetXY(32.3, 225.2); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_10_2'] == 'Y') { $ppdf->SetXY(32.3, 234.8); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_10_3'] == 'Y') { $ppdf->SetXY(32.3, 239.7); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_10_4'] == 'Y') { $ppdf->SetXY(32.3, 244.5); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_10_5'] == 'Y') { $ppdf->SetXY(32.3, 254.1); $ppdf->Write(0,'X'); }
+                        if ($pageNo == 2 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['2'], $getPreAuthData);
                         }
-
-                        // Page 3 for preauth_type 6: only Selection Criteria items 8.1/8.2 are
-                        // mapped. The oncologist-equivalent gastroenterologist medical-clearance
-                        // block and the "Informed Consent / Conforme by" block on this page have no
-                        // corresponding DB fields (see scope note above) and are left blank.
-                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6) {
-                            $cl = @$getPreAuthData['checklist'];
-
-                            if (@$cl['q_1_11'] == 'Y') { $ppdf->SetXY(163.0, 96.9); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_11'] == 'N') { $ppdf->SetXY(175.0, 96.9); $ppdf->Write(0,'X'); }
-                            // Note: the printed template has no "No" box for row 8.2 (only "Yes"
-                            // is printed) -- a 'N' value here has nowhere correct to be marked.
-                            if (@$cl['q_1_12'] == 'Y') { $ppdf->SetXY(163.0, 105.1); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_12_1'] == 'Y') { $ppdf->SetXY(30.3, 109.7); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_12_2'] == 'Y') { $ppdf->SetXY(30.3, 114.5); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_12_3'] == 'Y') { $ppdf->SetXY(30.3, 124.1); $ppdf->Write(0,'X'); }
+                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['3'], $getPreAuthData);
                         }
-
-                        // Page 4 for preauth_type 6: same scope note as page 3 -- the
-                        // gastroenterologist clearance block for item 10 and the two Informed
-                        // Consent / Conforme blocks (items 10 and 11) have no DB fields and are
-                        // left blank.
-                        if ($pageNo == 4 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6) {
-                            $cl = @$getPreAuthData['checklist'];
-
-                            if (@$cl['q_1_13'] == 'Y') { $ppdf->SetXY(163.0, 33.2); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_13'] == 'N') { $ppdf->SetXY(175.0, 33.2); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_14'] == 'Y') { $ppdf->SetXY(163.0, 41.4); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_14'] == 'NA') { $ppdf->SetXY(175.0, 41.4); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_15'] == 'Y') { $ppdf->SetXY(163.0, 60.8); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_15'] == 'NA') { $ppdf->SetXY(175.0, 60.8); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_16_1'] == 'Y') { $ppdf->SetXY(163.0, 224.9); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_16_1'] == 'NA') { $ppdf->SetXY(175.0, 224.9); $ppdf->Write(0,'X'); }
-                            if (@$cl['q_1_16_2'] == 'Y') { $ppdf->SetXY(163.0, 230.1); $ppdf->Write(0,'X'); }
-                            elseif (@$cl['q_1_16_2'] == 'NA') { $ppdf->SetXY(175.0, 230.1); $ppdf->Write(0,'X'); }
+                        if ($pageNo == 4 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['4'], $getPreAuthData);
                         }
-
-                        if ($pageNo == 5 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6) {
-                            $cl = @$getPreAuthData['checklist'];
-
-                            $pCentered($pDecrypt(@$cl['crtby_attendingnephrologist']), 5, 116, 100, 6);
-                            $pCentered($pDecrypt(@$cl['crtby_attendingtransplantsurgeon']), 112, 116, 100, 6);
-                            $pBoxedNumber($pDecrypt(@$cl['crtby_attendingnephrologist_accreno']), 23.8, 129, 4.16);
-                            $pBoxedNumber($pDecrypt(@$cl['crtby_attendingtransplantsurgeon_accreno']), 119, 129, 4.2);
-
-                            $pCentered($pDecrypt(@$cl['crtby_patient']), 112, 163, 100, 7);
-                            if (!empty(@$cl['crtby_patient_signeddate'])) {
-                                $ppdf->SetFont('Helvetica','',8);
-                                $ppdf->SetXY(150, 182.7); $ppdf->Write(0, date('m/d/Y', strtotime($cl['crtby_patient_signeddate'])));
-                            }
+                        if ($pageNo == 5 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['5'], $getPreAuthData);
                         }
-
-                        if ($pageNo == 6 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6) {
-                            $pi = $getPreAuthData['patientinfo'];
-                            $rq = @$getPreAuthData['request'];
-
-                            $ppdf->SetFont('Helvetica','',9);
-                            $ppdf->SetXY(140, 33.9);
-                            $ppdf->Write(0, !empty(@$pi['submitted_datetime']) ? date('m/d/Y', strtotime($pi['submitted_datetime'])) : '');
-
-                            $pCentered($pFullName($pi,'patient'), 15, 45.5, 90, 8);
-                            $pCentered($this->myutilities->getRef_Desc(104,@$pi['healthfacility_code']), 100, 45.5, 90, 8);
-
-                            // ZPAMS-FIX (2026-09): see the same fix's note on the CABG request page --
-                            // gate on 'wcp' explicitly rather than "anything not 'wocp'".
-                            if (@$rq['copayment'] == 'wocp') { $ppdf->SetXY(24, 78); $ppdf->Write(0,'X'); }
-                            elseif (@$rq['copayment'] == 'wcp') {
-                                $ppdf->SetXY(24, 83); $ppdf->Write(0,'X');
-                                $ppdf->SetXY(30, 89); $ppdf->Write(0, $pDecrypt(@$rq['copayment_amount']));
-                            }
-
-                            $pCentered($pDecrypt(@$rq['crtby_attendingnephrologist']), 5, 100, 105, 6);
-                            $pCentered($pDecrypt(@$rq['crtby_attendingtransplantsurgeon']), 112, 100, 95, 6);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingnephrologist_accreno']), 23.8, 117, 4.16);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingtransplantsurgeon_accreno']), 119, 117, 4.2);
-
-                            $pCentered($pDecrypt(@$rq['crtby_patient']), 5, 137, 105, 6);
-                            $pCentered($pDecrypt(@$rq['crtby_medicaldirectory']), 112, 137, 95, 6);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_medicaldirectory_accreno']), 119, 157.3, 4.2);
+                        if ($pageNo == 6 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 6 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['6'], $getPreAuthData);
                         }
 
                         if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 14) {
@@ -1710,58 +1493,45 @@ if(!isset($_SESSION['CompleteName']))
 
                             // ZPAMS-FIX (2026-09): see the same fix's note on the CABG request page --
                             // gate on 'wcp' explicitly rather than "anything not 'wocp'".
-                            if (@$rq['copayment'] == 'wocp') { $ppdf->SetXY(31, 88.8); $ppdf->Write(0,'X'); }
+                            //
+                            // ZPAMS-FIX (2026-09): re-measured against the checkbox glyphs' own bbox
+                            // (x=33.02-36.57) via word-level PDF text extraction -- x=31 sat left of
+                            // both boxes entirely. The purpose text at y=95.5 also sat low enough that
+                            // the printed underline cut through the middle of the letters instead of
+                            // sitting below them; raised to y=92.6 so it rests on the line.
+                            if (@$rq['copayment'] == 'wocp') { $ppdf->SetXY(33.3, 90.0); $ppdf->Write(0,'X'); }
                             elseif (@$rq['copayment'] == 'wcp') {
-                                $ppdf->SetXY(31, 95.8); $ppdf->Write(0,'X');
-                                $ppdf->SetXY(100, 95.5); $ppdf->Write(0, $pDecrypt(@$rq['with_copayment_purpose']));
+                                $ppdf->SetXY(33.3, 94.6); $ppdf->Write(0,'X');
+                                $ppdf->SetXY(100, 92.6); $ppdf->Write(0, $pDecrypt(@$rq['with_copayment_purpose']));
                             }
 
-                            // ZPAMS-FIX (2026-09): y was 108.5, landing above the "Certified correct
-                            // by:" row's own header instead of on the blank signature line below it.
-                            // Re-measured against a gridline overlay: the gap between that row's
-                            // bottom divider (~110.4) and the "(Printed name and signature)" caption
-                            // (~112.9) is only ~2.5mm, so this also needs a smaller font to avoid
-                            // touching the caption underneath.
-                            $pCentered($pDecrypt(@$rq['crtby_attendingphysician']), 10, 110.6, 90, 6);
-                            $pCentered($pDecrypt(@$rq['crtby_medicaldirectory']), 113, 110.6, 92, 6);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingphysician_accreno']), 51.3, 129.5);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_medicaldirectory_accreno']), 133.1, 129.5);
+                            // ZPAMS-FIX (2026-09): re-measured against the "Certified correct by:"
+                            // cell's own vertical divider (x=106.21-106.38, found via vector drawing
+                            // extraction) -- the previous x=10/w=90 and x=113/w=92 didn't match either
+                            // column's actual bounds (left cell: x=31.16-106.21; right cell:
+                            // x=106.38-186.94), so names centered against the wrong box and drifted.
+                            $pCentered($pDecrypt(@$rq['crtby_attendingphysician']), 31.16, 109.3, 75, 6);
+                            $pCentered($pDecrypt(@$rq['crtby_medicaldirectory']), 106.38, 109.3, 80.5, 6);
+                            // ZPAMS-FIX (2026-09): this row's PhilHealth Accreditation No. boxes are 14
+                            // uniform slots (pitch measured via vector drawing extraction at ~3.85mm)
+                            // for the same "XXXX-XXXXXXX-X" format used on page 1 -- pBoxedNumber()'s
+                            // digit-only stripping doesn't apply since the dash characters need their
+                            // own boxes too, so this writes the raw value (including dashes) one
+                            // character per box directly instead, same technique as page 1.
+                            $ppdf->SetFont('Helvetica','',8);
+                            foreach (str_split((string) $pDecrypt(@$rq['crtby_attendingphysician_accreno'])) as $i => $ch) {
+                                $ppdf->SetXY(51.39 + ($i * 3.85), 129.5); $ppdf->Write(0, $ch);
+                            }
+                            foreach (str_split((string) $pDecrypt(@$rq['crtby_medicaldirectory_accreno'])) as $i => $ch) {
+                                $ppdf->SetXY(133.10 + ($i * 3.85), 129.5); $ppdf->Write(0, $ch);
+                            }
                             $pCentered($pDecrypt(@$rq['crtby_patient']), 115, 142.5, 90, 9);
                         }
 
-                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 4) {
-                            $pi = $getPreAuthData['patientinfo'];
-                            $rq = @$getPreAuthData['request'];
-
-                            $ppdf->SetFont('Helvetica','',9);
-                            $ppdf->SetXY(135, 44);
-                            $ppdf->Write(0, !empty(@$pi['submitted_datetime']) ? date('m/d/Y', strtotime($pi['submitted_datetime'])) : '');
-
-                            $pCentered($pFullName($pi,'patient'), 20, 58, 45, 9);
-                            $pCentered($this->myutilities->getRef_Desc(104,@$pi['healthfacility_code']), 75, 58, 110, 9);
-
-                            // ZPAMS-FIX (2026-09): confirmed live on a seeded case with no copayment
-                            // answer set at all -- the old `else` marked "With co-payment" regardless.
-                            // Gate on 'wcp' explicitly rather than "anything not 'wocp'".
-                            if (@$rq['copayment'] == 'wocp') { $ppdf->SetXY(27.6, 95); $ppdf->Write(0,'X'); }
-                            elseif (@$rq['copayment'] == 'wcp') {
-                                $ppdf->SetXY(27.6, 99); $ppdf->Write(0,'X');
-                                $ppdf->SetXY(30, 112.5); $ppdf->Write(0, $pDecrypt(@$rq['with_copayment_purpose']));
-                            }
-                            // Treatment modality -- single-select radio (code 1 or 2, per
-                            // ref_zben_cc_treatmentmodality), same pattern as FIGO staging above.
-                            $tmY = [1=>87.5, 2=>101.5];
-                            $tmCode = (int) @$rq['treatmentmodality'];
-                            if (isset($tmY[$tmCode])) { $ppdf->SetXY(110.7, $tmY[$tmCode]); $ppdf->Write(0,'X'); }
-
-                            // Signature-line gap here is tight (~5.6mm from divider to caption),
-                            // matching the same issue found and fixed for Prostate CA's page 3 --
-                            // smaller font, positioned right after the divider.
-                            $pCentered($pDecrypt(@$rq['crtby_attendingqynecologiconcologist']), 8, 118.5, 100, 6);
-                            $pCentered($pDecrypt(@$rq['crtby_medicaldirectory']), 115, 118.5, 90, 6);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_attendingqynecologiconcologist_accreno']), 47.5, 143, 4.15);
-                            $pBoxedNumber($pDecrypt(@$rq['crtby_medicaldirectory_accreno']), 134.0, 143, 4.15);
-                            $pCentered($pDecrypt(@$rq['crtby_patient']), 118, 155.5, 88, 7);
+                        // ZPAMS-FIX (2026-09): Cervical Cancer page 3 migrated to $pRenderFields +
+                        // preauth_04.json, same verification/rollback approach as page 1 above.
+                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 4 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['3'], $getPreAuthData);
                         }
                     }
 

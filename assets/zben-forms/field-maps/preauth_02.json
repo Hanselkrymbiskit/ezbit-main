@@ -1,0 +1,120 @@
+{
+  "preauth_type": 2,
+  "illness": "Breast Cancer",
+  "template": "PreAuth_02.pdf",
+  "note": "Cytotoxic Chemotherapy Protocol sub-choice on page 2 (atp_cchemotherapy_protocol) IS mapped here.",
+  "pages": {
+    "1": [
+      { "type": "facility_name", "source": "patientinfo", "x": 70, "y": 52.2, "fontsize": 12, "align": "left" },
+      { "type": "facility_name", "source": "patientinfo", "x": 70, "y": 59.3, "fontsize": 12, "align": "left", "column": "inst_address_street" },
+
+      { "type": "fullname",  "source": "patientinfo", "prefix": "patient", "x": 50, "y": 70, "w": 98, "fontsize": 7 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "M", "x": 153, "y": 72.5, "fontsize": 9 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "F", "x": 169, "y": 72.5, "fontsize": 9 },
+      { "type": "boxed",     "source": "patientinfo", "field": "patient_philhealthno", "x": 113.9, "y": 79.5, "pitch": 4.2 },
+
+      { "type": "member_toggle", "source": "patientinfo", "conditionField": "patient_is_member", "match": "Y",
+        "same": { "type": "mark", "text": "SAME AS ABOVE", "x": 50, "y": 99, "fontsize": 7 },
+        "different": {
+          "member_name": { "type": "fullname", "source": "patientinfo", "prefix": "member", "x": 50, "y": 99, "w": 98, "fontsize": 7 },
+          "member_id":   { "type": "boxed", "source": "patientinfo", "field": "member_philhealthno", "x": 113.9, "y": 106.6, "pitch": 4.2 }
+        }
+      },
+
+      { "type": "checkbox", "source": "checklist", "field": "hpt_1", "match": "Y", "x": 25.5, "y": 136.1, "fontsize": 8 },
+      { "type": "text",     "source": "checklist", "field": "hpt_1_specify", "x": 71.2, "y": 139.1, "fontsize": 8 },
+      { "type": "date",     "source": "checklist", "field": "hpt_1_date", "x": 164.4, "y": 136.1, "fontsize": 8 },
+
+      { "type": "checkbox", "source": "checklist", "field": "hpt_2", "match": "Y", "x": 25.5, "y": 142.4, "fontsize": 8 },
+      { "type": "date",     "source": "checklist", "field": "hpt_2_date", "x": 164.4, "y": 142.4, "fontsize": 8 },
+
+      { "type": "checkbox", "source": "checklist", "field": "hpt_3", "match": "Y", "x": 25.5, "y": 148.6, "fontsize": 8 },
+      { "type": "date",     "source": "checklist", "field": "hpt_3_date", "x": 164.4, "y": 148.6, "fontsize": 8 },
+
+      { "type": "checkbox", "source": "checklist", "field": "hpt_4", "match": "Y", "x": 25.5, "y": 154.9, "fontsize": 8 },
+      { "type": "text",     "source": "checklist", "field": "hpt_4_specify", "x": 86.4, "y": 157.9, "fontsize": 8 },
+      { "type": "date",     "source": "checklist", "field": "hpt_4_date", "x": 164.4, "y": 154.9, "fontsize": 8 },
+
+      { "type": "checkbox", "source": "checklist", "field": "menstrual", "match": "pre",  "x": 25.5,  "y": 181.5, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "menstrual", "match": "post", "x": 105.8, "y": 181.5, "fontsize": 8 },
+
+      { "type": "radio", "source": "checklist", "field": "HER2", "fontsize": 8,
+        "options": { "0": [25.5, 193.9], "2": [83.8, 193.9], "3": [134.5, 193.9] }
+      },
+
+      { "type": "checkbox", "source": "checklist", "field": "laterality_r", "match": "Y", "x": 25.5,  "y": 210.2, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "laterality_l", "match": "Y", "x": 109.3, "y": 210.2, "fontsize": 8 },
+
+      { "type": "radio", "source": "checklist", "field": "clinical_staging_r", "fontsize": 8,
+        "options": { "1": [25.5, 215.3], "2": [25.5, 220.2], "3": [25.5, 225.1], "4": [25.5, 230], "5": [25.5, 234.9], "6": [25.5, 239.8], "7": [25.5, 244.7], "8": [25.5, 249.6], "9": [25.5, 254.5] }
+      },
+      { "type": "radio", "source": "checklist", "field": "clinical_staging_l", "fontsize": 8,
+        "options": { "1": [109.3, 215.3], "2": [109.3, 220.2], "3": [109.3, 225.1], "4": [109.3, 230], "5": [109.3, 234.9], "6": [109.3, 239.8], "7": [109.3, 244.7], "8": [109.3, 249.6], "9": [109.3, 254.5] }
+      }
+    ],
+    "2": [
+      { "type": "checkbox", "source": "checklist", "field": "atp_surgery", "match": "A", "x": 115.9, "y": 39.4, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "atp_surgery", "match": "N", "x": 142.6, "y": 39.4, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "atp_hormonaltherapy", "match": "Y", "x": 27.6, "y": 48.9, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "atp_cchemotherapy", "match": "A", "x": 115.9, "y": 56.7, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "atp_cchemotherapy", "match": "N", "x": 142.6, "y": 56.7, "fontsize": 8 },
+
+      { "type": "checkbox", "source": "checklist", "field": "atp_cchemotherapy_protocol", "match": "ACT", "x": 115.9, "y": 76.2, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "atp_cchemotherapy_protocol", "match": "ACP", "x": 115.9, "y": 95.7, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "atp_cchemotherapy_protocol", "match": "TCB", "x": 115.9, "y": 115.2, "fontsize": 8 },
+
+      { "type": "checkbox", "source": "checklist", "field": "atp_targettherapy", "match": "Y", "x": 27.6, "y": 127.6, "fontsize": 8 },
+      { "type": "text",     "source": "checklist", "field": "atp_targettherapy_specify", "x": 150, "y": 134.5, "fontsize": 8 },
+      { "type": "checkbox", "source": "checklist", "field": "atp_surveillance", "match": "Y", "x": 27.6, "y": 147.7, "fontsize": 8 }
+    ],
+    "3": [
+      { "type": "facility_name", "source": "patientinfo", "x": 70, "y": 28.8, "fontsize": 8, "align": "left" },
+      { "type": "facility_name", "source": "patientinfo", "x": 70, "y": 38.1, "fontsize": 8, "align": "left", "column": "inst_address_street" },
+
+      { "type": "fullname",  "source": "patientinfo", "prefix": "patient", "x": 50, "y": 46.5, "w": 98, "fontsize": 7 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "M", "x": 153, "y": 53.4, "fontsize": 9 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "F", "x": 169, "y": 53.4, "fontsize": 9 },
+      { "type": "boxed",     "source": "patientinfo", "field": "patient_philhealthno", "x": 113.9, "y": 60.3, "pitch": 4.2 },
+
+      { "type": "member_toggle", "source": "patientinfo", "conditionField": "patient_is_member", "match": "Y",
+        "same": { "type": "mark", "text": "SAME AS ABOVE", "x": 50, "y": 80, "fontsize": 7 },
+        "different": {
+          "member_name": { "type": "fullname", "source": "patientinfo", "prefix": "member", "x": 50, "y": 80, "w": 98, "fontsize": 7 },
+          "member_id":   { "type": "boxed", "source": "patientinfo", "field": "member_philhealthno", "x": 113.9, "y": 87.1, "pitch": 4.2 }
+        }
+      },
+
+      { "type": "centered", "source": "checklist", "field": "crtby_attendingmedoncologist", "decrypt": true, "x": 5, "y": 124.5, "w": 105, "fontsize": 6 },
+      { "type": "centered", "source": "checklist", "field": "crtby_attendingsurgeon", "decrypt": true, "x": 112, "y": 124.5, "w": 105, "fontsize": 6 },
+      { "type": "boxed",    "source": "checklist", "field": "crtby_attendingmedoncologist_accreno", "decrypt": true, "x": 38, "y": 137, "pitch": 4.5 },
+      { "type": "boxed",    "source": "checklist", "field": "crtby_attendingsurgeon_accreno", "decrypt": true, "x": 134.5, "y": 137, "pitch": 4.3 },
+
+      { "type": "centered", "source": "checklist", "field": "crtby_attendingradoncologist", "decrypt": true, "x": 5, "y": 176.5, "w": 105, "fontsize": 6 },
+      { "type": "boxed",    "source": "checklist", "field": "crtby_attendingradoncologist_accreno", "decrypt": true, "x": 38, "y": 189, "pitch": 4.5 },
+
+      { "type": "centered", "source": "checklist", "field": "crtby_patient", "decrypt": true, "x": 112, "y": 176.5, "w": 105, "fontsize": 7 },
+      { "type": "date",     "source": "checklist", "field": "crtby_patient_signeddate", "x": 163, "y": 192.5, "fontsize": 7 }
+    ],
+    "4": [
+      { "type": "date",     "source": "patientinfo", "field": "submitted_datetime", "x": 90, "y": 27.5, "fontsize": 9 },
+      { "type": "fullname", "source": "patientinfo", "prefix": "patient", "x": 15, "y": 37, "w": 90, "fontsize": 8 },
+      { "type": "facility_name", "source": "patientinfo", "x": 100, "y": 37, "w": 90, "fontsize": 8 },
+
+      { "type": "checkbox", "source": "request", "field": "copayment", "match": "wocp", "x": 18.6, "y": 69, "fontsize": 8 },
+      { "type": "checkbox", "source": "request", "field": "copayment", "match": "wcp", "x": 18.6, "y": 74, "fontsize": 8 },
+      { "type": "text",     "source": "request", "field": "with_copayment_purpose", "decrypt": true, "x": 30, "y": 80, "fontsize": 8 },
+
+      { "type": "centered", "source": "request", "field": "crtby_attendingmedoncologist", "decrypt": true, "x": 5, "y": 93, "w": 105, "fontsize": 6 },
+      { "type": "centered", "source": "request", "field": "crtby_attendingsurgeon", "decrypt": true, "x": 112, "y": 93, "w": 95, "fontsize": 6 },
+      { "type": "boxed",    "source": "request", "field": "crtby_attendingmedoncologist_accreno", "decrypt": true, "x": 37.8, "y": 108, "pitch": 4.5 },
+      { "type": "boxed",    "source": "request", "field": "crtby_attendingsurgeon_accreno", "decrypt": true, "x": 134.5, "y": 108, "pitch": 4.3 },
+
+      { "type": "centered", "source": "request", "field": "crtby_attendingradoncologist", "decrypt": true, "x": 5, "y": 127, "w": 105, "fontsize": 6 },
+      { "type": "centered", "source": "request", "field": "crtby_medicaldirectory", "decrypt": true, "x": 112, "y": 127, "w": 95, "fontsize": 6 },
+      { "type": "boxed",    "source": "request", "field": "crtby_attendingradoncologist_accreno", "decrypt": true, "x": 37.8, "y": 149, "pitch": 4.5 },
+      { "type": "boxed",    "source": "request", "field": "crtby_medicaldirectory_accreno", "decrypt": true, "x": 134.5, "y": 149, "pitch": 4.3 },
+
+      { "type": "centered", "source": "request", "field": "crtby_patient", "decrypt": true, "x": 112, "y": 168, "w": 95, "fontsize": 7 }
+    ]
+  }
+}

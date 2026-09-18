@@ -1,0 +1,58 @@
+{
+  "preauth_type": 4,
+  "illness": "Cervical Cancer",
+  "template": "PreAuth_04.pdf",
+  "pages": {
+    "1": [
+      { "type": "fullname",  "source": "patientinfo", "prefix": "patient", "x": 50, "y": 73, "w": 98, "fontsize": 7 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "M", "x": 153, "y": 75, "fontsize": 9 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "F", "x": 167, "y": 75, "fontsize": 9 },
+      { "type": "boxed",     "source": "patientinfo", "field": "patient_philhealthno", "x": 107.6, "y": 80, "pitch": 5.55 },
+
+      { "type": "member_toggle", "source": "patientinfo", "conditionField": "patient_is_member", "match": "Y",
+        "same": { "type": "mark", "x": 53, "y": 89, "fontsize": 9 },
+        "different": {
+          "member_name": { "type": "fullname", "source": "patientinfo", "prefix": "member", "x": 50, "y": 96, "w": 98, "fontsize": 7 },
+          "member_id":   { "type": "boxed", "source": "patientinfo", "field": "member_philhealthno", "x": 107.6, "y": 102, "pitch": 5.55 }
+        }
+      },
+
+      { "type": "checkbox", "source": "patientinfo", "field": "fulfilled_selection_criteria", "match": "Y", "x": 82, "y": 111.5, "fontsize": 9 },
+      { "type": "checkbox", "source": "patientinfo", "field": "fulfilled_selection_criteria", "match": "N", "x": 82, "y": 119.5, "fontsize": 9 },
+      { "type": "text",     "source": "patientinfo", "field": "fulfilled_selection_criteria_reason", "x": 95, "y": 126, "fontsize": 9 },
+
+      { "type": "checkbox", "source": "checklist", "field": "q_1_1", "x": 163, "y": 156, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_2", "x": 163, "y": 161, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_3", "x": 163, "y": 166, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_4", "x": 163, "y": 171, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_1_5", "x": 163, "y": 176, "fontsize": 9 },
+
+      { "type": "radio", "source": "checklist", "field": "q_2_1", "fontsize": 9,
+        "options": { "1": [103, 197], "2": [103, 202], "3": [103, 207], "4": [103, 211.5], "5": [103, 216.5], "6": [103, 221.5], "7": [103, 226.5], "8": [103, 231.5], "9": [103, 236.5] },
+        "note": "q_2_1_date is written by a small coupled PHP snippet right after this call (needs the SAME row Y as whichever stage was picked -- not expressible as a flat field in this schema)."
+      },
+
+      { "type": "centered", "source": "checklist", "field": "crtby_attendingqynecologiconcologist", "decrypt": true, "x": 116, "y": 248, "w": 68, "fontsize": 7 },
+      { "type": "boxed",    "source": "checklist", "field": "crtby_attendingqynecologiconcologist_accreno", "decrypt": true, "x": 126.9, "y": 260, "pitch": 4.15 }
+    ],
+    "3": [
+      { "type": "date",     "source": "patientinfo", "field": "submitted_datetime", "x": 135, "y": 44, "fontsize": 9 },
+      { "type": "fullname", "source": "patientinfo", "prefix": "patient", "x": 20, "y": 58, "w": 45, "fontsize": 9 },
+      { "type": "facility_name", "source": "patientinfo", "x": 75, "y": 58, "w": 110, "fontsize": 9 },
+
+      { "type": "checkbox", "source": "request", "field": "copayment", "match": "wocp", "x": 27.6, "y": 95, "fontsize": 9 },
+      { "type": "checkbox", "source": "request", "field": "copayment", "match": "wcp", "x": 27.6, "y": 99, "fontsize": 9 },
+      { "type": "text",     "source": "request", "field": "with_copayment_purpose", "decrypt": true, "x": 30, "y": 112.5, "fontsize": 9 },
+
+      { "type": "radio", "source": "request", "field": "treatmentmodality", "fontsize": 9,
+        "options": { "1": [110.7, 87.5], "2": [110.7, 101.5] }
+      },
+
+      { "type": "centered", "source": "request", "field": "crtby_attendingqynecologiconcologist", "decrypt": true, "x": 8,   "y": 118.5, "w": 100, "fontsize": 6 },
+      { "type": "centered", "source": "request", "field": "crtby_medicaldirectory",               "decrypt": true, "x": 115, "y": 118.5, "w": 90,  "fontsize": 6 },
+      { "type": "boxed",    "source": "request", "field": "crtby_attendingqynecologiconcologist_accreno", "decrypt": true, "x": 47.5,  "y": 143, "pitch": 4.15 },
+      { "type": "boxed",    "source": "request", "field": "crtby_medicaldirectory_accreno",               "decrypt": true, "x": 134.0, "y": 143, "pitch": 4.15 },
+      { "type": "centered", "source": "request", "field": "crtby_patient", "decrypt": true, "x": 118, "y": 155.5, "w": 88, "fontsize": 7 }
+    ]
+  }
+}

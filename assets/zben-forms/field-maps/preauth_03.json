@@ -1,0 +1,67 @@
+{
+  "preauth_type": 3,
+  "illness": "CABG",
+  "template": "PreAuth_03.pdf",
+  "pages": {
+    "1": [
+      { "type": "fullname",  "source": "patientinfo", "prefix": "patient", "x": 50, "y": 83.5, "w": 98, "fontsize": 7 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "M", "x": 153, "y": 83.5, "fontsize": 9 },
+      { "type": "checkbox",  "source": "patientinfo", "field": "patient_sex", "match": "F", "x": 169, "y": 83.5, "fontsize": 9 },
+      { "type": "boxed",     "source": "patientinfo", "field": "patient_philhealthno", "x": 107.6, "y": 90, "pitch": 5.55 },
+
+      { "type": "member_toggle", "source": "patientinfo", "conditionField": "patient_is_member", "match": "Y",
+        "same": { "type": "mark", "x": 52.5, "y": 97.5, "fontsize": 9 },
+        "different": {
+          "member_name": { "type": "fullname", "source": "patientinfo", "prefix": "member", "x": 50, "y": 107, "w": 98, "fontsize": 7 },
+          "member_id":   { "type": "boxed", "source": "patientinfo", "field": "member_philhealthno", "x": 107.6, "y": 114, "pitch": 5.55 }
+        }
+      },
+
+      { "type": "checkbox", "source": "patientinfo", "field": "fulfilled_selection_criteria", "match": "Y", "x": 82, "y": 128.5, "fontsize": 9 },
+      { "type": "checkbox", "source": "patientinfo", "field": "fulfilled_selection_criteria", "match": "N", "x": 82, "y": 133.5, "fontsize": 9 },
+      { "type": "text",     "source": "patientinfo", "field": "fulfilled_selection_criteria_reason", "x": 95, "y": 140, "fontsize": 9 },
+
+      { "type": "checkbox", "source": "checklist", "field": "q_1_age", "match": "Y", "x": 167, "y": 173, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_2_1",   "match": "Y", "x": 167, "y": 205, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_2_2_a", "match": "Y", "x": 167, "y": 226, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_2_2_b", "match": "Y", "x": 167, "y": 236, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_2_2_c", "match": "Y", "x": 167, "y": 246, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_2_2_d", "match": "Y", "x": 167, "y": 256, "fontsize": 9 }
+    ],
+    "2": [
+      { "type": "checkbox", "source": "checklist", "field": "q_2_3_a", "match": "Y", "x": 167, "y": 45.6, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_2_3_b", "match": "Y", "x": 167, "y": 52.5, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_2_4",   "match": "Y", "x": 167, "y": 62.5, "fontsize": 9 },
+
+      { "type": "checkbox", "source": "checklist", "field": "q_3_1", "match": "Y", "x": 150, "y": 97, "fontsize": 9 },
+      { "type": "date",     "source": "checklist", "field": "q_3_1_date", "x": 172, "y": 97, "fontsize": 9 },
+      { "type": "checkbox", "source": "checklist", "field": "q_3_2", "match": "Y", "x": 150, "y": 109.5, "fontsize": 9 },
+      { "type": "date",     "source": "checklist", "field": "q_3_2_date", "x": 172, "y": 109.5, "fontsize": 9 },
+
+      { "type": "centered", "source": "checklist", "field": "crtby_attendingcardiologist", "decrypt": true, "x": 8, "y": 146.5, "w": 100, "fontsize": 6 },
+      { "type": "centered", "source": "checklist", "field": "crtby_attendingcardiovascularsurgeon", "decrypt": true, "x": 115, "y": 146.5, "w": 90, "fontsize": 6 },
+      { "type": "boxed",    "source": "checklist", "field": "crtby_attendingcardiologist_accreno", "decrypt": true, "x": 47.5, "y": 162.7, "pitch": 4.15 },
+      { "type": "boxed",    "source": "checklist", "field": "crtby_attendingcardiovascularsurgeon_accreno", "decrypt": true, "x": 134.0, "y": 162.7, "pitch": 4.15 },
+      { "type": "centered", "source": "checklist", "field": "crtby_patient", "decrypt": true, "x": 115, "y": 191.5, "w": 90, "fontsize": 7 },
+      { "type": "date",     "source": "checklist", "field": "crtby_patient_signeddate", "x": 160, "y": 202.5, "fontsize": 8 }
+    ],
+    "3": [
+      { "type": "date",     "source": "patientinfo", "field": "submitted_datetime", "x": 135, "y": 52, "fontsize": 9 },
+      { "type": "fullname", "source": "patientinfo", "prefix": "patient", "x": 20, "y": 68, "w": 45, "fontsize": 9 },
+      { "type": "facility_name", "source": "patientinfo", "x": 75, "y": 68, "w": 110, "fontsize": 9 },
+
+      { "type": "checkbox", "source": "request", "field": "copayment", "match": "wocp", "x": 27.6, "y": 97, "fontsize": 9 },
+      { "type": "checkbox", "source": "request", "field": "copayment", "match": "wcp", "x": 27.6, "y": 103, "fontsize": 9 },
+      { "type": "text",     "source": "request", "field": "with_copayment_purpose", "decrypt": true, "x": 95, "y": 103, "fontsize": 9 },
+
+      { "type": "centered", "source": "request", "field": "crtby_attendingcardiologist", "decrypt": true, "x": 8, "y": 119, "w": 100, "fontsize": 6 },
+      { "type": "centered", "source": "request", "field": "crtby_attendingcardiovascularsurgeon", "decrypt": true, "x": 115, "y": 119, "w": 90, "fontsize": 6 },
+      { "type": "boxed",    "source": "request", "field": "crtby_attendingcardiologist_accreno", "decrypt": true, "x": 47.5, "y": 135.5, "pitch": 4.15 },
+      { "type": "boxed",    "source": "request", "field": "crtby_attendingcardiovascularsurgeon_accreno", "decrypt": true, "x": 134.0, "y": 135.5, "pitch": 4.15 },
+
+      { "type": "centered", "source": "request", "field": "crtby_patient", "decrypt": true, "x": 8, "y": 150, "w": 100, "fontsize": 7 },
+      { "type": "centered", "source": "request", "field": "crtby_medicaldirectory", "decrypt": true, "x": 115, "y": 150, "w": 90, "fontsize": 6 },
+      { "type": "boxed",    "source": "request", "field": "crtby_medicaldirectory_accreno", "decrypt": true, "x": 134.0, "y": 168, "pitch": 4.15 }
+    ]
+  }
+}
