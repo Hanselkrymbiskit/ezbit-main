@@ -383,10 +383,24 @@ class Index extends MY_Controller {
                 }
             }
 
-            $validate = $this->m_preauth->vFormData($required,$SubmittedParam,true);
+            // ZPAMS-FIX (2026-09): $eFlds=true made vFormData() build Message from the raw
+            // field-key list, whose values are always the literal string 'Invalid Value' --
+            // never actually readable. M_claims::vFormData() (no $eFlds toggle) always uses
+            // the Description list instead, which is the readable "Invalid Value for X, this
+            // is a required field!" text -- switched to false to match that working convention.
+            $validate = $this->m_preauth->vFormData($required,$SubmittedParam,false);
             if( $validate['Status'] == 1 )
             {
                 $return = $this->m_preauth->ProcessPreAuth($required,$SubmittedParam,$SubmittedFiles,$dupdates,@$PreAuthData);
+            }
+            else
+            {
+                // ZPAMS-FIX (2026-09): this branch didn't exist -- $validate['Message'] (the
+                // actual reason validation failed) was computed and then discarded, leaving
+                // $return at its generic default from the top of this function ('Failed to
+                // Process Submitted Pre-Authorization Form') with no indication of which
+                // field was missing or invalid.
+                $return['Message'] = $validate['Message'];
             }
         }
         catch (PDOException $e) {
@@ -436,8 +450,14 @@ class Index extends MY_Controller {
                 break;
 
                 case 2: // BAS - PRO
-                case 3: // PRO 
-                    $wtble = "a.healthfacility_pro = '".((int) $this->userregistrationinfo['ProCode'])."'";
+                case 3: // PRO
+                    // ZPAMS-FIX (2026-09): (int) here strips the leading zero from ProCode
+                    // (e.g. '01' -> 1 -> '1'), but healthfacility_pro is stored zero-padded
+                    // ('01'). Comparing a plain string column to '1' never matches '01', so
+                    // BAS/PRO accounts saw zero cases regardless of jurisdiction. Every other
+                    // classification's filter in this switch already uses the raw string
+                    // value with no cast -- this brings ProCode in line with that pattern.
+                    $wtble = "a.healthfacility_pro = '".$this->userregistrationinfo['ProCode']."'";
                     $ttble = 'trans_preauth_form';
                 break;
 

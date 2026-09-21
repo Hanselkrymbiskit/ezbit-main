@@ -351,6 +351,22 @@ if(!isset($_SESSION['CompleteName']))
                         {
                             $userregisteredData = $this->sqlhelper->local->select("user_register")->where("user_id='".$this->userid."'")->row();
                             $this->userregistrationinfo = ($userregisteredData['Count']) ? $userregisteredData['Data'] : [];
+
+                            // ZPAMS-FIX (2026-09): accounts created outside the normal registration flow
+                            // (M_register.php / M_useraccount.php are the only places that generate this key)
+                            // can end up with a NULL User_E_Key. Every PHP-level encrypt/decrypt call in this
+                            // app -- Claims case-no URL tokens, CompleteName, the oPrivateKey passphrase just
+                            // below -- silently returns false on a NULL key, which surfaces downstream as an
+                            // empty URL param or a 500. Self-heal here so no account can stay in this state,
+                            // the same way oPrivateKey is lazily generated right after this block.
+                            if( array_key_exists('User_E_Key', $this->userprofile) && ($this->userprofile['User_E_Key'] == '' || is_null($this->userprofile['User_E_Key'])) )
+                            {
+                                $User_E_Key = base64_encode( $this->encryption->create_key(16) );
+                                $this->sqlhelper->local->update("user_profiles")->ex_update(array('User_E_Key' => $User_E_Key))->where("user_id = '".$this->userid."'")->run();
+                                $this->userprofile['User_E_Key'] = $User_E_Key;
+                                $_SESSION['sys_userprofile']['Data']['User_E_Key'] = $User_E_Key;
+                            }
+
                             if( array_key_exists('oPrivateKey', $this->userprofile) && $this->userprofile['oPrivateKey'] == '' )
                             {
                                 $this->generateRSAKeys($this->userprofile);
@@ -1268,6 +1284,16 @@ if(!isset($_SESSION['CompleteName']))
                            // HCP/Address on this same page use the shared y=52.5/59 correctly, so only
                            // Case No needed its own override here.
                             $isProstate = ((int) @$getPreAuthData['patientinfo']['preauth_type'] == 14);
+                            // ZPAMS-FIX (2026-09): Tetralogy of Fallot (16) and Ventricular Septal
+                            // Defect (17, 18) are mapped entirely through the JSON field-map engine
+                            // from the start (no pre-existing hardcoded block to migrate) -- their
+                            // Case No./HCP/Address positions differ enough from every other template
+                            // (measured directly against each PDF) that reusing the shared defaults
+                            // below would print this header data on top of the label text instead of
+                            // beside it. Suppressed here; each illness's own JSON "text"/"facility_name"
+                            // entries cover all three fields instead.
+                            $isTOF = in_array((int) @$getPreAuthData['patientinfo']['preauth_type'], [16, 17, 18], true);
+                            if (!$isTOF) {
                            // Case No
                             $ppdf->SetXY($isProstate ? 50 : 43, $isProstate ? 36.4 : 42.5);
                             $ppdf->Write(0,@$getPreAuthData['patientinfo']['case_no']);
@@ -1284,6 +1310,7 @@ if(!isset($_SESSION['CompleteName']))
                             // Address
                             $ppdf->SetXY(70, $isCabg ? 74 : 59);
                             $ppdf->Write(0,$this->myutilities->getRef_Desc(104,@$getPreAuthData['patientinfo']['healthfacility_code'],false,'inst_address_street'));
+                            }
 
                             if ((int) @$getPreAuthData['patientinfo']['preauth_type'] == 14) {
                                 $pi = $getPreAuthData['patientinfo'];
@@ -1402,6 +1429,25 @@ if(!isset($_SESSION['CompleteName']))
                             if ((int) @$getPreAuthData['patientinfo']['preauth_type'] == 3 && $fieldMap) {
                                 $pRenderFields($fieldMap['pages']['1'], $getPreAuthData);
                             }
+
+                            // ZPAMS-FIX (2026-09): Tetralogy of Fallot (preauth_type 16) field mapping
+                            // driven by the config engine + assets/zben-forms/field-maps/preauth_16.json
+                            // (all 3 pages). First illness mapped without ever having a hardcoded
+                            // block -- built and verified directly against PreAuth_16.pdf's own
+                            // measured coordinates.
+                            if ((int) @$getPreAuthData['patientinfo']['preauth_type'] == 16 && $fieldMap) {
+                                $pRenderFields($fieldMap['pages']['1'], $getPreAuthData);
+                            }
+
+                            // ZPAMS-FIX (2026-09): Ventricular Septal Defect (preauth_type 17 Surgery,
+                            // 18 Closure w/ Associated Special Conditions) field mapping driven by the
+                            // config engine + assets/zben-forms/field-maps/preauth_17.json /
+                            // preauth_18.json (all 3 pages each). Same "no hardcoded block" approach
+                            // as TOF; page 1 holds header+patient/member+qualifications+diagnostics
+                            // together for this template family, unlike TOF's page1/2 split.
+                            if (in_array((int) @$getPreAuthData['patientinfo']['preauth_type'], [17, 18], true) && $fieldMap) {
+                                $pRenderFields($fieldMap['pages']['1'], $getPreAuthData);
+                            }
                         }
 
                         if ($pageNo == 2 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 3 && $fieldMap) {
@@ -1409,6 +1455,22 @@ if(!isset($_SESSION['CompleteName']))
                         }
 
                         if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 3 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['3'], $getPreAuthData);
+                        }
+
+                        if ($pageNo == 2 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 16 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['2'], $getPreAuthData);
+                        }
+
+                        if ($pageNo == 3 && (int) @$getPreAuthData['patientinfo']['preauth_type'] == 16 && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['3'], $getPreAuthData);
+                        }
+
+                        if ($pageNo == 2 && in_array((int) @$getPreAuthData['patientinfo']['preauth_type'], [17, 18], true) && $fieldMap) {
+                            $pRenderFields($fieldMap['pages']['2'], $getPreAuthData);
+                        }
+
+                        if ($pageNo == 3 && in_array((int) @$getPreAuthData['patientinfo']['preauth_type'], [17, 18], true) && $fieldMap) {
                             $pRenderFields($fieldMap['pages']['3'], $getPreAuthData);
                         }
 
@@ -1542,6 +1604,14 @@ if(!isset($_SESSION['CompleteName']))
                         'FileName' => $fileNameTitle,
                         'FileType' => 'application/pdf',
                         'FileData' => base64_encode($pBlobContent),
+                        // ZPAMS-FIX (2026-09): ObjectFileViewer() (assets/js/coreutilities.js) hides
+                        // the embedded PDF viewer's native toolbar (#toolbar=0) unless this flag is
+                        // explicitly set -- that toolbar is what carries the browser's print and
+                        // download/save controls. Without it, the "Print/Download Pre-Authorization
+                        // Checklist & Request" button opened a PDF with no way to actually print or
+                        // download it. Matches the working pattern already used for attachment
+                        // previews in claims/form/preauthforms/preauth_submit.php.
+                        'ToolBar'  => 'true',
                         'nonce'    => $this->nonceV
                     ];
 

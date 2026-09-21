@@ -207,6 +207,17 @@ $(document).ready(function(){
 		$("[type='hidden'][name='request[copayment]']").val($(this).val());
 	});
 
+	/* ZPAMS-FIX (2026-09): the Chair/Chief radios and their paired hidden field all share the
+	   same name -- unlike the copayment pattern above, nothing kept the hidden field (the one
+	   actually marked required) in sync with the checked radio, so validation always saw it
+	   as blank ("Attending Pediatric Type" required-field error) no matter what was selected.
+	   NOTE: this must stay a slash-star block comment, not a double-slash line comment --
+	   the view loader strips newlines from this file's rendered output, and a line comment
+	   with no line break after it would swallow every statement that follows on this script tag. */
+	$("[type='radio'][name='request[crtby_attendingpediatriccardiology_type]'][forminputgroup='preauthFormData']").click(function(){
+		$("[type='hidden'][name='request[crtby_attendingpediatriccardiology_type]']").val($(this).val());
+	});
+
 <?php } ?>
 });
 </script>
